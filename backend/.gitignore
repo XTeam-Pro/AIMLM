@@ -6,3 +6,4 @@ app.egg-info
 htmlcov
 .cache
 .venv
+/app/alembic/versions/b07830321ea2_fix_roles_list_type.py
