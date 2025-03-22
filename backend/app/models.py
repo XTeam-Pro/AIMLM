@@ -1,6 +1,4 @@
 import uuid
-from typing import Optional
-
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 

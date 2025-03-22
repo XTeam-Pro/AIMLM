@@ -1,5 +1,6 @@
+from typing import Union
+
 from fastapi import APIRouter, HTTPException
-from typing import List
 from sqlmodel import select
 from starlette.responses import JSONResponse
 
@@ -21,8 +22,8 @@ def create_product(product: ProductCreate) -> ProductPublic:
     return ProductPublic(**product_dict)
 
 
-@router.get("/read_all", response_model=List[ProductPublic])
-def get_all_products() -> List[ProductPublic] | HTTPException:
+@router.get("/read_all", response_model=list[ProductPublic])
+def get_all_products() -> list[ProductPublic] | HTTPException:
     """
     Retrieve all products from the database.
     """
@@ -65,8 +66,8 @@ def update_product(product_id: str, product: ProductUpdate) -> ProductPublic | H
     raise HTTPException(status_code=404, detail="Product not found")
 
 
-@router.delete("/delete/{product_id}", status_code=200)
-def delete_product(product_id: str) -> HTTPException | JSONResponse:
+@router.delete("/delete/{product_id}")
+def delete_product(product_id: str) -> Union[HTTPException, JSONResponse]:
     """
     Delete a product by its ID.
     """
@@ -76,12 +77,12 @@ def delete_product(product_id: str) -> HTTPException | JSONResponse:
     return JSONResponse(status_code=200, content=f"Product with id {product_id} successfully deleted")
 
 
-@router.get("/recommendations/{limit}", response_model=List[ProductPublic])
+@router.get("/recommendations/{limit}", response_model=list[ProductPublic])
 def get_recommendations(
         limit: int,
         user: CurrentUser,
         session: SessionDep,
-) -> List[ProductPublic] | HTTPException:
+) -> list[ProductPublic] | HTTPException:
     """
     Returns a list of recommended products depending on items picked up by a user.
     """
