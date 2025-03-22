@@ -14,7 +14,7 @@ on:
         description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
         required: false
         default: 'false'
-
+# Grant these permissions to the workflow to access the list of changed files
 permissions:
   pull-requests: read
   contents: read
