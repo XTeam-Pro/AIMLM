@@ -78,6 +78,7 @@ def create_item(*, session: Session, item_in: ItemCreate, owner_id: uuid.UUID) -
     session.refresh(db_item)
     return db_item
 
+
 # def delete_product(*, session: Session, product_id: uuid.UUID) -> None:
 #     product = get_product_by_id(session=session, product_id=product_id)
 #     if product:

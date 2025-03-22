@@ -50,8 +50,7 @@ class User(UserBase, table=True):
 
     # Relationship with Items
     items: list["Item"] = Relationship(
-        back_populates="owner",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        back_populates="owner", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
 
@@ -66,6 +65,7 @@ class UsersPublic(SQLModel):
 
 
 # ======== Item Models ======== #
+
 
 # Shared properties
 class ItemBase(SQLModel):
@@ -89,9 +89,7 @@ class Item(ItemBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     title: str = Field(max_length=255)
 
-    owner_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False
-    )
+    owner_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
 
     # Relationship with User
     owner: User | None = Relationship(back_populates="items")
@@ -109,6 +107,7 @@ class ItemsPublic(SQLModel):
 
 
 # ======== Product Models ======== #
+
 
 class ProductBase(BaseModel):
     title: str = Field(min_length=1, max_length=255)
@@ -130,6 +129,7 @@ class ProductPublic(ProductBase):
 
 
 # ======== Token & Security Models ======== #
+
 
 # Generic message
 class Message(SQLModel):

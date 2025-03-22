@@ -11,9 +11,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.get("/", response_model=list[ProductPublic])
-def read_products(
-    skip: int = 0, limit: int = 100
-) -> Any:
+def read_products(skip: int = 0, limit: int = 100) -> Any:
     """
     Retrieve products.
     """
@@ -30,9 +28,7 @@ def read_products(
 
 
 @router.get("/{id}", response_model=ProductPublic)
-def read_product(
-    product_id: str
-) -> Any:
+def read_product(product_id: str) -> Any:
     """
     Fetch product by id.
     """
@@ -44,9 +40,7 @@ def read_product(
 
 
 @router.post("/", response_model=ProductPublic, status_code=201)
-def create_product(
-    *, product_in: ProductCreate
-) -> Any:
+def create_product(*, product_in: ProductCreate) -> Any:
     """
     Create new product.
     """
@@ -78,9 +72,7 @@ def update_product(
 
 
 @router.delete("/{id}")
-def delete_product(
-    product_id: str
-) -> Message:
+def delete_product(product_id: str) -> Message:
     """
     Delete a product.
     """
@@ -100,11 +92,13 @@ def get_recommendations(
     """
     Returns a list of recommended products based on items purchased by the user.
     """
-    purchased_items = session.exec(select(Item).where(Item.owner_id == current_user.id)).all()
+    purchased_items = session.exec(
+        select(Item).where(Item.owner_id == current_user.id)
+    ).all()
     if not purchased_items:
         raise HTTPException(
             status_code=404,
-            detail="You have no recommendations, start buying to get them!"
+            detail="You have no recommendations, start buying to get them!",
         )
 
     purchased_titles = {item.title for item in purchased_items}
@@ -112,17 +106,17 @@ def get_recommendations(
     matching_products = products_collection.find(
         {"title": {"$in": list(purchased_titles)}}
     )
-    unique_categories = {product["category"] for product in matching_products if "category" in product}
+    unique_categories = {
+        product["category"] for product in matching_products if "category" in product
+    }
 
     if not unique_categories:
         raise HTTPException(
-            status_code=404,
-            detail="No categories found for matching products!"
+            status_code=404, detail="No categories found for matching products!"
         )
 
     recommended_products = products_collection.find(
-        {"category": {"$in": list(unique_categories)}},
-        limit=limit
+        {"category": {"$in": list(unique_categories)}}, limit=limit
     ).sort("rating", -1)
 
     formatted_products = []
