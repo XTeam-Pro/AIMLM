@@ -9,6 +9,5 @@ api_router.include_router(utils.router)
 api_router.include_router(items.router)
 api_router.include_router(products.router)
 
-
 if settings.ENVIRONMENT == "local":
     api_router.include_router(private.router)
