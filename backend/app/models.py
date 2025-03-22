@@ -1,7 +1,8 @@
 import uuid
-from pydantic import EmailStr, BaseModel
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr
 from sqlmodel import Field, Relationship, SQLModel
-from typing import Optional, List
 
 
 # ======== User Models ======== #
@@ -11,7 +12,7 @@ class UserBase(SQLModel):
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
-    full_name: Optional[str] = Field(default=None, max_length=255)
+    full_name: str | None = Field(default=None, max_length=255)
 
 
 # Properties to receive via API on creation
@@ -22,21 +23,21 @@ class UserCreate(UserBase):
 class UserRegister(SQLModel):
     email: EmailStr = Field(max_length=255)
     password: str = Field(min_length=8, max_length=40)
-    full_name: Optional[str] = Field(default=None, max_length=255)
+    full_name: str | None = Field(default=None, max_length=255)
 
 
 # Properties to receive via API on update, all are optional
 class UserUpdate(SQLModel):
-    email: Optional[EmailStr] = Field(default=None, max_length=255)
-    password: Optional[str] = Field(default=None, min_length=8, max_length=40)
-    is_active: Optional[bool] = Field(default=None)
-    is_superuser: Optional[bool] = Field(default=None)
-    full_name: Optional[str] = Field(default=None, max_length=255)
+    email: EmailStr | None = Field(default=None, max_length=255)
+    password: str | None = Field(default=None, min_length=8, max_length=40)
+    is_active: bool | None = Field(default=None)
+    is_superuser: bool | None = Field(default=None)
+    full_name: str | None = Field(default=None, max_length=255)
 
 
 class UserUpdateMe(SQLModel):
-    full_name: Optional[str] = Field(default=None, max_length=255)
-    email: Optional[EmailStr] = Field(default=None, max_length=255)
+    full_name: str | None = Field(default=None, max_length=255)
+    email: EmailStr | None = Field(default=None, max_length=255)
 
 
 class UpdatePassword(SQLModel):
@@ -50,7 +51,7 @@ class User(UserBase, table=True):
     hashed_password: str
 
     # Relationship with Items
-    items: List["Item"] = Relationship(
+    items: list["Item"] = Relationship(
         back_populates="owner",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
@@ -62,7 +63,7 @@ class UserPublic(UserBase):
 
 
 class UsersPublic(SQLModel):
-    data: List[UserPublic]
+    data: list[UserPublic]
     count: int
 
 
@@ -71,7 +72,7 @@ class UsersPublic(SQLModel):
 # Shared properties
 class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
 
 
 # Properties to receive on item creation
@@ -81,8 +82,8 @@ class ItemCreate(ItemBase):
 
 # Properties to receive on item update
 class ItemUpdate(SQLModel):
-    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=255)
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
 
 
 # Database model, database table inferred from class name
@@ -95,7 +96,7 @@ class Item(ItemBase, table=True):
     )
 
     # Relationship with User
-    owner: Optional[User] = Relationship(back_populates="items")
+    owner: User | None = Relationship(back_populates="items")
 
 
 # Properties to return via API, id is always required
@@ -105,7 +106,7 @@ class ItemPublic(ItemBase):
 
 
 class ItemsPublic(SQLModel):
-    data: List[ItemPublic]
+    data: list[ItemPublic]
     count: int
 
 
@@ -145,9 +146,10 @@ class Token(SQLModel):
 
 # Contents of JWT token
 class TokenPayload(SQLModel):
-    sub: Optional[str] = None
+    sub: str | None = None
 
 
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=40)
+

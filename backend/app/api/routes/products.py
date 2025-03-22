@@ -65,7 +65,7 @@ def update_product(product_id: str, product: ProductUpdate) -> ProductPublic | H
     raise HTTPException(status_code=404, detail="Product not found")
 
 
-@router.delete("/delete/{product_id}", status_code=204)
+@router.delete("/delete/{product_id}", status_code=200)
 def delete_product(product_id: str) -> HTTPException | JSONResponse:
     """
     Delete a product by its ID.
