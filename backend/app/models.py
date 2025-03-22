@@ -1,7 +1,5 @@
 import uuid
 
-from bson import ObjectId
-from fastapi.encoders import ENCODERS_BY_TYPE
 from pydantic import EmailStr, BaseModel
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, List
@@ -31,7 +29,7 @@ class UserRegister(SQLModel):
 # Properties to receive via API on update, all are optional
 class UserUpdate(UserBase):
     email: Optional[EmailStr] = Field(default=None, max_length=255)
-    password: Optional[str] = Field(default=None, min_length=8, max_length=40)
+    password: str = Field(default=None, min_length=8, max_length=40)
 
 
 class UserUpdateMe(SQLModel):
@@ -109,8 +107,7 @@ class ItemsPublic(SQLModel):
 
 # ======== Product Models ======== #
 
-# Add supporting ObjectId in Pydantic
-ENCODERS_BY_TYPE[ObjectId] = str
+
 
 class ProductBase(BaseModel):
     title: str = Field(min_length=1, max_length=255)

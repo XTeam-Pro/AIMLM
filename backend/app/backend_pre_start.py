@@ -4,6 +4,7 @@ from sqlalchemy import Engine
 from sqlmodel import Session, select
 from tenacity import after_log, before_log, retry, stop_after_attempt, wait_fixed
 
+from app.core.config import settings
 from app.core.db import engine, init_db
 from app.core.mongo_db import init_mongo
 
@@ -44,7 +45,8 @@ def main() -> None:
 
     # Проверяем доступность MongoDB
     logger.info("Checking MongoDB connection")
-    init_mongo()
+    if settings.MONGO_INIT:
+        init_mongo()
 
     logger.info("Service finished initializing")
 

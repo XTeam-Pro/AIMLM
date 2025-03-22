@@ -11,7 +11,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.post("/", response_model=ProductPublic, status_code=201)
-def create_product(product: ProductCreate):
+def create_product(product: ProductCreate) -> ProductPublic:
     """
     Create a new product in the database.
     """
@@ -22,7 +22,7 @@ def create_product(product: ProductCreate):
 
 
 @router.get("/read_all", response_model=List[ProductPublic])
-def get_all_products():
+def get_all_products() -> List[ProductPublic] | HTTPException:
     """
     Retrieve all products from the database.
     """
@@ -39,7 +39,7 @@ def get_all_products():
 
 
 @router.get("/read/{product_id}", response_model=ProductPublic)
-def get_product(product_id: str):
+def get_product(product_id: str) -> ProductPublic | HTTPException:
     """
     Retrieve a single product by its ID.
     """
@@ -51,7 +51,7 @@ def get_product(product_id: str):
 
 
 @router.put("/update/{product_id}", response_model=ProductPublic)
-def update_product(product_id: str, product: ProductUpdate):
+def update_product(product_id: str, product: ProductUpdate) -> ProductPublic | HTTPException:
     """
     Update a product by its ID.
     """
@@ -66,7 +66,7 @@ def update_product(product_id: str, product: ProductUpdate):
 
 
 @router.delete("/delete/{product_id}", status_code=204)
-def delete_product(product_id: str):
+def delete_product(product_id: str) -> HTTPException | JSONResponse:
     """
     Delete a product by its ID.
     """
@@ -81,7 +81,7 @@ def get_recommendations(
         limit: int,
         user: CurrentUser,
         session: SessionDep,
-):
+) -> List[ProductPublic] | HTTPException:
     """
     Returns a list of recommended products depending on items picked up by a user.
     """

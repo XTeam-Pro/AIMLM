@@ -11,7 +11,7 @@ db = client[settings.MONGO_DB]
 products_collection = db["product"]
 
 
-def init_mongo():
+def init_mongo() -> None:
     """
     Initializes MongoDB.
     """
@@ -51,7 +51,3 @@ def init_mongo():
         })
     except Exception as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
-
-if __name__ == "__main__":
-    if settings.MONGO_INIT:
-        init_mongo()
