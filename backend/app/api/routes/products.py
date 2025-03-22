@@ -59,7 +59,7 @@ def update_product(
         *,
         product_id: str,
         product_in: ProductUpdate,
-) -> Any:
+) -> ProductPublic:
     """
     Update a product.
     """
