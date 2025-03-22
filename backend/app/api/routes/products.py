@@ -42,6 +42,7 @@ def read_product(
     product["id"] = str(product["_id"])
     return ProductPublic(**product)
 
+
 @router.post("/", response_model=ProductPublic, status_code=201)
 def create_product(
         *, product_in: ProductCreate
@@ -74,6 +75,7 @@ def update_product(
         raise HTTPException(status_code=404, detail="Product not found")
     updated_product["id"] = str(updated_product["_id"])
     return ProductPublic(**updated_product)
+
 
 @router.delete("/{id}")
 def delete_product(
