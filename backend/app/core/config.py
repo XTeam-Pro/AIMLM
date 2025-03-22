@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     MONGO_URL: str = "mongodb://mongo_db:27017/"
     MONGO_DB: str = "vilavi_shop_db"
     MONGO_INIT: int = 1
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:

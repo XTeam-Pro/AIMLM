@@ -31,11 +31,7 @@ def init(db_engine: Engine) -> None:
         raise e
 
 
-
-
-
 def main() -> None:
-
     logger.info("Initializing service")
 
     # Проверяем доступность SQL базы данных

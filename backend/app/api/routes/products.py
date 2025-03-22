@@ -1,37 +1,27 @@
-from typing import Union
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
-from starlette.responses import JSONResponse
 
+from app.api.deps import CurrentUser, SessionDep
 from app.core.mongo_db import products_collection
-from app.models import Item, ProductCreate, ProductPublic, ProductUpdate
-from app.api.deps import SessionDep, CurrentUser
+from app.models import ProductCreate, ProductPublic, ProductUpdate, Message, Item
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-@router.post("/", response_model=ProductPublic, status_code=201)
-def create_product(product: ProductCreate) -> ProductPublic:
+@router.get("/", response_model=ProductPublic)
+def read_products(
+        skip: int = 0, limit: int = 100
+) -> Any:
     """
-    Create a new product in the database.
+    Retrieve products.
     """
-    product_dict = product.model_dump()
-    result = products_collection.insert_one(product_dict)
-    product_dict["id"] = str(result.inserted_id)
-    return ProductPublic(**product_dict)
-
-
-@router.get("/read_all", response_model=list[ProductPublic])
-def get_all_products() -> list[ProductPublic] | HTTPException:
-    """
-    Retrieve all products from the database.
-    """
-    products_cursor = products_collection.find()
+    products_cursor = products_collection.find().skip(skip).limit(limit)
     products_list = list(products_cursor)
 
     if not products_list:
-        raise HTTPException(status_code=404, detail="There are no products")
+        raise HTTPException(status_code=404, detail="No products found")
 
     for product in products_list:
         product["id"] = str(product["_id"])
@@ -39,54 +29,74 @@ def get_all_products() -> list[ProductPublic] | HTTPException:
     return [ProductPublic(**product) for product in products_list]
 
 
-@router.get("/read/{product_id}", response_model=ProductPublic)
-def get_product(product_id: str) -> ProductPublic | HTTPException:
+@router.get("/{id}", response_model=ProductPublic)
+def read_product(product_id: str) -> Any:
     """
-    Retrieve a single product by its ID.
+    Get product by ID.
     """
-    product = products_collection.find_one({"_id": product_id})
-    if product:
-        product["id"] = str(product["_id"])
-        return ProductPublic(**product)
-    raise HTTPException(status_code=404, detail="Product not found")
-
-
-@router.put("/update/{product_id}", response_model=ProductPublic)
-def update_product(product_id: str, product: ProductUpdate) -> ProductPublic | HTTPException:
-    """
-    Update a product by its ID.
-    """
-    update_data = {k: v for k, v in product.model_dump().items() if v is not None}
-    if update_data:
-        products_collection.update_one({"_id": product_id}, {"$set": update_data})
-    updated_product = products_collection.find_one({"_id": product_id})
-    if updated_product:
-        updated_product["id"] = str(updated_product["_id"])
-        return ProductPublic(**updated_product)
-    raise HTTPException(status_code=404, detail="Product not found")
-
-
-@router.delete("/delete/{product_id}")
-def delete_product(product_id: str) -> Union[HTTPException, JSONResponse]:
-    """
-    Delete a product by its ID.
-    """
-    result = products_collection.delete_one({"_id": product_id})
-    if result.deleted_count == 0:
+    product = products_collection.find_one({"_id": str(product_id)})
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return JSONResponse(status_code=200, content=f"Product with id {product_id} successfully deleted")
+    product["id"] = str(product["_id"])
+    return ProductPublic(**product)
+
+
+@router.post("/", response_model=ProductPublic, status_code=201)
+def create_product(
+        *, product_in: ProductCreate
+) -> Any:
+    """
+    Create new product.
+    """
+    product_dict = product_in.model_dump()
+    result = products_collection.insert_one(product_dict)
+    product_dict["id"] = str(result.inserted_id)
+    return ProductPublic(**product_dict)
+
+
+@router.put("/{id}", response_model=ProductPublic)
+def update_product(
+        *,
+        product_id: str,
+        product_in: ProductUpdate,
+) -> Any:
+    """
+    Update a product.
+    """
+    product = products_collection.find_one({"_id": str(product_id)})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    update_data = product_in.model_dump(exclude_unset=True)
+    products_collection.update_one({"_id": str(product_id)}, {"$set": update_data})
+    updated_product = products_collection.find_one({"_id": str(product_id)})
+    updated_product["id"] = str(updated_product["_id"])
+    return ProductPublic(**updated_product)
+
+
+@router.delete("/{id}")
+def delete_product(
+        product_id: str
+) -> Message:
+    """
+    Delete a product.
+    """
+    product = products_collection.find_one({"_id": str(product_id)})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    products_collection.delete_one({"_id": str(product_id)})
+    return Message(message="Product deleted successfully")
 
 
 @router.get("/recommendations/{limit}", response_model=list[ProductPublic])
 def get_recommendations(
         limit: int,
-        user: CurrentUser,
+        current_user: CurrentUser,
         session: SessionDep,
-) -> list[ProductPublic] | HTTPException:
+) -> Any:
     """
-    Returns a list of recommended products depending on items picked up by a user.
+    Returns a list of recommended products based on items purchased by the user.
     """
-    purchased_items = session.exec(select(Item).where(Item.owner_id == user.id)).all()
+    purchased_items = session.exec(select(Item).where(Item.owner_id == current_user.id)).all()
     if not purchased_items:
         raise HTTPException(
             status_code=404,
