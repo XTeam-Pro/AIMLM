@@ -4,7 +4,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
-from app.models import Item, ItemCreate, User, UserCreate, UserUpdate, Product, ProductCreate, ProductUpdate
+from app.models import Item, ItemCreate, User, UserCreate, UserUpdate, ProductCreate, ProductPublic
 
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:
@@ -17,12 +17,12 @@ def create_user(*, session: Session, user_create: UserCreate) -> User:
     return db_obj
 
 
-def create_product(*, session: Session, product_create: ProductCreate, owner_id: uuid.UUID) -> Product:
-    db_product = Product.model_validate(product_create, update={"owner_id": owner_id})
-    session.add(db_product)
-    session.commit()
-    session.refresh(db_product)
-    return db_product
+# def create_product(*, session: Session, product_create: ProductCreate, owner_id: uuid.UUID) -> Product:
+#     db_product = Product.model_validate(product_create, update={"owner_id": owner_id})
+#     session.add(db_product)
+#     session.commit()
+#     session.refresh(db_product)
+#     return db_product
 
 
 def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
@@ -39,25 +39,25 @@ def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
     return db_user
 
 
-def update_product(*, session: Session, db_product: Product, product_in: ProductUpdate) -> Product:
-    product_data = product_in.model_dump(exclude_unset=True)
-    db_product.sqlmodel_update(product_data)
-    session.add(db_product)
-    session.commit()
-    session.refresh(db_product)
-    return db_product
-
-
+# def update_product(*, session: Session, db_product: Product, product_in: ProductUpdate) -> Product:
+#     product_data = product_in.model_dump(exclude_unset=True)
+#     db_product.sqlmodel_update(product_data)
+#     session.add(db_product)
+#     session.commit()
+#     session.refresh(db_product)
+#     return db_product
+#
+#
 def get_user_by_email(*, session: Session, email: str) -> User | None:
     statement = select(User).where(User.email == email)
     session_user = session.exec(statement).first()
     return session_user
-
-
-def get_product_by_id(*, session: Session, product_id: uuid.UUID) -> Product | None:
-    statement = select(Product).where(Product.id == product_id)
-    session_product = session.exec(statement).first()
-    return session_product
+#
+#
+# def get_product_by_id(*, session: Session, product_id: uuid.UUID) -> Product | None:
+#     statement = select(Product).where(Product.id == product_id)
+#     session_product = session.exec(statement).first()
+#     return session_product
 
 
 def authenticate(*, session: Session, email: str, password: str) -> User | None:
@@ -77,8 +77,8 @@ def create_item(*, session: Session, item_in: ItemCreate, owner_id: uuid.UUID) -
     return db_item
 
 
-def delete_product(*, session: Session, product_id: uuid.UUID) -> None:
-    product = get_product_by_id(session=session, product_id=product_id)
-    if product:
-        session.delete(product)
-        session.commit()
+# def delete_product(*, session: Session, product_id: uuid.UUID) -> None:
+#     product = get_product_by_id(session=session, product_id=product_id)
+#     if product:
+#         session.delete(product)
+#         session.commit()

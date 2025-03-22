@@ -1,6 +1,8 @@
 import uuid
-import json
-from pydantic import EmailStr
+
+from bson import ObjectId
+from fastapi.encoders import ENCODERS_BY_TYPE
+from pydantic import EmailStr, BaseModel
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, List
 
@@ -53,12 +55,6 @@ class User(UserBase, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
-    # Relationship with Products
-    owned_products: List["Product"] = Relationship(
-        back_populates="owner",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    )
-
 
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
@@ -77,7 +73,6 @@ class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: Optional[str] = Field(default=None, max_length=255)
 
-
 # Properties to receive on item creation
 class ItemCreate(ItemBase):
     pass
@@ -92,6 +87,7 @@ class ItemUpdate(ItemBase):
 class Item(ItemBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     title: str = Field(max_length=255)
+
     owner_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False
     )
@@ -113,45 +109,23 @@ class ItemsPublic(SQLModel):
 
 # ======== Product Models ======== #
 
-# Shared properties
-class ProductBase(SQLModel):
+# Add supporting ObjectId in Pydantic
+ENCODERS_BY_TYPE[ObjectId] = str
+
+class ProductBase(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=255)
+    category: str = Field(max_length=100)
     price: float = Field(gt=0.0)
+    rating: float = Field(gt=0.0, le=5)
 
-
-# Properties to receive on product creation
 class ProductCreate(ProductBase):
     pass
 
-
-# Properties to receive on product update
 class ProductUpdate(ProductBase):
-    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    pass
 
-
-# Database model, database table inferred from class name
-class Product(ProductBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    title: str = Field(max_length=255)
-    price: float
-    owner_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False
-    )
-
-    # Relationship with User
-    owner: Optional[User] = Relationship(back_populates="owned_products")
-
-
-# Properties to return via API, id is always required
 class ProductPublic(ProductBase):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-
-
-class ProductsPublic(SQLModel):
-    data: List[ProductPublic]
-    count: int
+    id: str
 
 
 # ======== Token & Security Models ======== #

@@ -1,63 +1,119 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from typing import List
-from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import select
+from starlette.responses import JSONResponse
 
-from app.models import ProductBase, ProductCreate, Product
-from app.api.deps import SessionDep
+from app.core.mongo_db import products_collection
+from app.models import Item, ProductCreate, ProductPublic, ProductUpdate
+from app.api.deps import SessionDep, CurrentUser
 
-# Создание маршрутизатора
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-@router.get("/", response_model=List[ProductBase])
-async def get_products(session: SessionDep):
-    """Получить список всех продуктов"""
-    statement = select(Product)
-    products = session.exec(statement).all()
-    return products
+@router.post("/", response_model=ProductPublic, status_code=201)
+def create_product(product: ProductCreate):
+    """
+    Create a new product in the database.
+    """
+    product_dict = product.model_dump()
+    result = products_collection.insert_one(product_dict)
+    product_dict["id"] = str(result.inserted_id)
+    return ProductPublic(**product_dict)
 
 
-@router.get("/{product_id}", response_model=ProductBase)
-async def get_product(product_id: int, session: SessionDep):
-    """Получить продукт по ID"""
-    product = session.get(Product, product_id)
+@router.get("/read_all", response_model=List[ProductPublic])
+def get_all_products():
+    """
+    Retrieve all products from the database.
+    """
+    products_cursor = products_collection.find()
+    products_list = list(products_cursor)
+
+    if not products_list:
+        raise HTTPException(status_code=404, detail="There are no products")
+
+    for product in products_list:
+        product["id"] = str(product["_id"])
+
+    return [ProductPublic(**product) for product in products_list]
+
+
+@router.get("/read/{product_id}", response_model=ProductPublic)
+def get_product(product_id: str):
+    """
+    Retrieve a single product by its ID.
+    """
+    product = products_collection.find_one({"_id": product_id})
     if product:
-        return product
-    raise HTTPException(status_code=404, detail="Продукт не найден")
+        product["id"] = str(product["_id"])
+        return ProductPublic(**product)
+    raise HTTPException(status_code=404, detail="Product not found")
 
 
-@router.post("/", response_model=ProductBase)
-async def create_product(product: ProductCreate, session: SessionDep):
-    """Добавить новый продукт"""
-    new_product = Product.from_orm(product)
-    session.add(new_product)
-    session.commit()
-    session.refresh(new_product)
-    return new_product
+@router.put("/update/{product_id}", response_model=ProductPublic)
+def update_product(product_id: str, product: ProductUpdate):
+    """
+    Update a product by its ID.
+    """
+    update_data = {k: v for k, v in product.model_dump().items() if v is not None}
+    if update_data:
+        products_collection.update_one({"_id": product_id}, {"$set": update_data})
+    updated_product = products_collection.find_one({"_id": product_id})
+    if updated_product:
+        updated_product["id"] = str(updated_product["_id"])
+        return ProductPublic(**updated_product)
+    raise HTTPException(status_code=404, detail="Product not found")
 
 
-@router.put("/{product_id}", response_model=ProductBase)
-async def update_product(product_id: int, updated_product: ProductCreate, session: SessionDep):
-    """Обновить информацию о продукте по ID"""
-    product = session.get(Product, product_id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Продукт не найден")
-    updated_data = updated_product.dict(exclude_unset=True)
-    for key, value in updated_data.items():
-        setattr(product, key, value)
-    session.add(product)
-    session.commit()
-    session.refresh(product)
-    return product
+@router.delete("/delete/{product_id}", status_code=204)
+def delete_product(product_id: str):
+    """
+    Delete a product by its ID.
+    """
+    result = products_collection.delete_one({"_id": product_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return JSONResponse(status_code=204, content=f"Product with id {product_id} successfully deleted")
 
 
-@router.delete("/{product_id}")
-async def delete_product(product_id: int, session: SessionDep):
-    """Удалить продукт по ID"""
-    product = session.get(Product, product_id)
-    if product:
-        session.delete(product)
-        session.commit()
-        return {"detail": "Продукт успешно удален"}
-    raise HTTPException(status_code=404, detail="Продукт не найден")
+@router.get("/recommendations/{limit}", response_model=List[ProductPublic])
+def get_recommendations(
+        limit: int,
+        user: CurrentUser,
+        session: SessionDep,
+):
+    """
+    Returns a list of recommended products depending on items picked up by a user.
+    """
+    purchased_items = session.exec(select(Item).where(Item.owner_id == user.id)).all()
+    if not purchased_items:
+        raise HTTPException(
+            status_code=404,
+            detail="You have no recommendations, start buying to get them!"
+        )
+
+    purchased_titles = {item.title for item in purchased_items}
+
+    matching_products = products_collection.find(
+        {"title": {"$in": list(purchased_titles)}}
+    )
+    unique_categories = {product["category"] for product in matching_products if "category" in product}
+
+    if not unique_categories:
+        raise HTTPException(
+            status_code=404,
+            detail="No categories found for matching products!"
+        )
+
+    recommended_products = products_collection.find(
+        {"category": {"$in": list(unique_categories)}},
+        limit=limit
+    ).sort("rating", -1)
+
+    formatted_products = []
+    for product in recommended_products:
+        product["id"] = str(product["_id"])
+        del product["_id"]
+        formatted_products.append(product)
+
+    return [ProductPublic(**product) for product in formatted_products]
