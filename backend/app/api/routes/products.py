@@ -5,14 +5,14 @@ from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.mongo_db import products_collection
-from app.models import ProductCreate, ProductPublic, ProductUpdate, Message, Item
+from app.models import Item, Message, ProductCreate, ProductPublic, ProductUpdate
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-@router.get("/", response_model=ProductPublic)
+@router.get("/", response_model=list[ProductPublic])
 def read_products(
-        skip: int = 0, limit: int = 100
+    skip: int = 0, limit: int = 100
 ) -> Any:
     """
     Retrieve products.
@@ -31,12 +31,12 @@ def read_products(
 
 @router.get("/{id}", response_model=ProductPublic)
 def read_product(
-        product_id: str
+    product_id: str
 ) -> Any:
     """
-    Fetch product by id
+    Fetch product by id.
     """
-    product = products_collection.find_one({"_id": str(product_id)})
+    product = products_collection.find_one({"_id": product_id})
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     product["id"] = str(product["_id"])
@@ -45,7 +45,7 @@ def read_product(
 
 @router.post("/", response_model=ProductPublic, status_code=201)
 def create_product(
-        *, product_in: ProductCreate
+    *, product_in: ProductCreate
 ) -> Any:
     """
     Create new product.
@@ -58,19 +58,19 @@ def create_product(
 
 @router.put("/{id}", response_model=ProductPublic)
 def update_product(
-        *,
-        product_id: str,
-        product_in: ProductUpdate,
+    *,
+    product_id: str,
+    product_in: ProductUpdate,
 ) -> ProductPublic:
     """
-    Update a product
+    Update a product.
     """
-    product = products_collection.find_one({"_id": str(product_id)})
+    product = products_collection.find_one({"_id": product_id})
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     update_data = product_in.model_dump(exclude_unset=True)
-    products_collection.update_one({"_id": str(product_id)}, {"$set": update_data})
-    updated_product = products_collection.find_one({"_id": str(product_id)})
+    products_collection.update_one({"_id": product_id}, {"$set": update_data})
+    updated_product = products_collection.find_one({"_id": product_id})
     if updated_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     updated_product["id"] = str(updated_product["_id"])
@@ -79,23 +79,23 @@ def update_product(
 
 @router.delete("/{id}")
 def delete_product(
-        product_id: str
+    product_id: str
 ) -> Message:
     """
     Delete a product.
     """
-    product = products_collection.find_one({"_id": str(product_id)})
+    product = products_collection.find_one({"_id": product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    products_collection.delete_one({"_id": str(product_id)})
+    products_collection.delete_one({"_id": product_id})
     return Message(message="Product deleted successfully")
 
 
 @router.get("/recommendations/{limit}", response_model=list[ProductPublic])
 def get_recommendations(
-        limit: int,
-        current_user: CurrentUser,
-        session: SessionDep,
+    limit: int,
+    current_user: CurrentUser,
+    session: SessionDep,
 ) -> Any:
     """
     Returns a list of recommended products based on items purchased by the user.
