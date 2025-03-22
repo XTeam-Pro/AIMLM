@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "12345"
-    POSTGRES_DB: str = ""
+    POSTGRES_PASSWORD: str = "string123"
+    POSTGRES_DB: str = "app"
     MONGO_URL: str = "mongodb://mongo_db:27017/"
     MONGO_DB: str = "vilavi_shop_db"
     MONGO_INIT: int = 1
@@ -96,8 +96,8 @@ class Settings(BaseSettings):
     # TODO: update type to EmailStr when sqlmodel supports it
     EMAIL_TEST_USER: str = "test@example.com"
     # TODO: update type to EmailStr when sqlmodel supports it
-    FIRST_SUPERUSER: str
-    FIRST_SUPERUSER_PASSWORD: str = "12345"
+    FIRST_SUPERUSER: str = "admin@example.com"
+    FIRST_SUPERUSER_PASSWORD: str = "string123"
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
