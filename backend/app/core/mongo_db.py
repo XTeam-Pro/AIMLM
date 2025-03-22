@@ -6,7 +6,7 @@ from app.core.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-client = MongoClient(settings.MONGO_URL, serverSelectionTimeoutMS=5000)
+client: MongoClient = MongoClient(settings.MONGO_URL, serverSelectionTimeoutMS=5000)
 db = client[settings.MONGO_DB]
 products_collection = db["product"]
 

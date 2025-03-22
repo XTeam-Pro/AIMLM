@@ -1,5 +1,4 @@
 import uuid
-
 from pydantic import EmailStr, BaseModel
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, List
@@ -27,9 +26,12 @@ class UserRegister(SQLModel):
 
 
 # Properties to receive via API on update, all are optional
-class UserUpdate(UserBase):
+class UserUpdate(SQLModel):
     email: Optional[EmailStr] = Field(default=None, max_length=255)
-    password: str = Field(default=None, min_length=8, max_length=40)
+    password: Optional[str] = Field(default=None, min_length=8, max_length=40)
+    is_active: Optional[bool] = Field(default=None)
+    is_superuser: Optional[bool] = Field(default=None)
+    full_name: Optional[str] = Field(default=None, max_length=255)
 
 
 class UserUpdateMe(SQLModel):
@@ -71,14 +73,16 @@ class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: Optional[str] = Field(default=None, max_length=255)
 
+
 # Properties to receive on item creation
 class ItemCreate(ItemBase):
     pass
 
 
 # Properties to receive on item update
-class ItemUpdate(ItemBase):
+class ItemUpdate(SQLModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=255)
 
 
 # Database model, database table inferred from class name
@@ -107,19 +111,20 @@ class ItemsPublic(SQLModel):
 
 # ======== Product Models ======== #
 
-
-
 class ProductBase(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     category: str = Field(max_length=100)
     price: float = Field(gt=0.0)
     rating: float = Field(gt=0.0, le=5)
 
+
 class ProductCreate(ProductBase):
     pass
 
+
 class ProductUpdate(ProductBase):
     pass
+
 
 class ProductPublic(ProductBase):
     id: str

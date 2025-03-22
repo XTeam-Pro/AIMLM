@@ -73,7 +73,7 @@ def delete_product(product_id: str) -> HTTPException | JSONResponse:
     result = products_collection.delete_one({"_id": product_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
-    return JSONResponse(status_code=204, content=f"Product with id {product_id} successfully deleted")
+    return JSONResponse(status_code=200, content=f"Product with id {product_id} successfully deleted")
 
 
 @router.get("/recommendations/{limit}", response_model=List[ProductPublic])
