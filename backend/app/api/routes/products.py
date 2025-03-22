@@ -30,16 +30,17 @@ def read_products(
 
 
 @router.get("/{id}", response_model=ProductPublic)
-def read_product(product_id: str) -> Any:
+def read_product(
+        product_id: str
+) -> Any:
     """
-    Get product by ID.
+    Fetch product by id
     """
     product = products_collection.find_one({"_id": str(product_id)})
-    if not product:
+    if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     product["id"] = str(product["_id"])
     return ProductPublic(**product)
-
 
 @router.post("/", response_model=ProductPublic, status_code=201)
 def create_product(
@@ -61,17 +62,18 @@ def update_product(
         product_in: ProductUpdate,
 ) -> ProductPublic:
     """
-    Update a product.
+    Update a product
     """
     product = products_collection.find_one({"_id": str(product_id)})
-    if not product:
+    if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     update_data = product_in.model_dump(exclude_unset=True)
     products_collection.update_one({"_id": str(product_id)}, {"$set": update_data})
     updated_product = products_collection.find_one({"_id": str(product_id)})
+    if updated_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
     updated_product["id"] = str(updated_product["_id"])
     return ProductPublic(**updated_product)
-
 
 @router.delete("/{id}")
 def delete_product(
