@@ -10,9 +10,9 @@ from app.models import ProductCreate, ProductPublic, ProductUpdate, Message, Ite
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-@router.get("/", response_model=ProductPublic)
+@router.get("/", response_model=list[ProductPublic])
 def read_products(
-        skip: int = 0, limit: int = 100
+    skip: int = 0, limit: int = 100
 ) -> Any:
     """
     Retrieve products.
@@ -43,7 +43,7 @@ def read_product(product_id: str) -> Any:
 
 @router.post("/", response_model=ProductPublic, status_code=201)
 def create_product(
-        *, product_in: ProductCreate
+    *, product_in: ProductCreate
 ) -> Any:
     """
     Create new product.
@@ -56,9 +56,9 @@ def create_product(
 
 @router.put("/{id}", response_model=ProductPublic)
 def update_product(
-        *,
-        product_id: str,
-        product_in: ProductUpdate,
+    *,
+    product_id: str,
+    product_in: ProductUpdate,
 ) -> Any:
     """
     Update a product.
@@ -66,16 +66,21 @@ def update_product(
     product = products_collection.find_one({"_id": str(product_id)})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
     update_data = product_in.model_dump(exclude_unset=True)
     products_collection.update_one({"_id": str(product_id)}, {"$set": update_data})
+
     updated_product = products_collection.find_one({"_id": str(product_id)})
+    if not updated_product:
+        raise HTTPException(status_code=500, detail="Failed to fetch updated product")
+
     updated_product["id"] = str(updated_product["_id"])
     return ProductPublic(**updated_product)
 
 
 @router.delete("/{id}")
 def delete_product(
-        product_id: str
+    product_id: str
 ) -> Message:
     """
     Delete a product.
@@ -89,9 +94,9 @@ def delete_product(
 
 @router.get("/recommendations/{limit}", response_model=list[ProductPublic])
 def get_recommendations(
-        limit: int,
-        current_user: CurrentUser,
-        session: SessionDep,
+    limit: int,
+    current_user: CurrentUser,
+    session: SessionDep,
 ) -> Any:
     """
     Returns a list of recommended products based on items purchased by the user.
