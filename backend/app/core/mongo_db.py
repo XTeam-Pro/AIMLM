@@ -28,11 +28,15 @@ def init_mongo() -> None:
             validator={
                 "$jsonSchema": {
                     "bsonType": "object",
-                    "required": ["title", "category", "price", "rating"],
+                    "required": ["title", "description", "category", "price", "rating"],
                     "properties": {
                         "title": {
                             "bsonType": "string",
                             "description": "Title of the product",
+                        },
+                        "description": {
+                            "bsonType": "string",
+                            "description": "Description of the product",
                         },
                         "category": {
                             "bsonType": "string",
