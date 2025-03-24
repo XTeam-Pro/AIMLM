@@ -11,7 +11,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.get("/", response_model=list[ProductPublic])
-def read_products(skip: int = 0, limit: int = 100) -> Any:
+def read_products(current_user: CurrentUser, skip: int = 0, limit: int = 100) -> Any:
     """
     Retrieve products.
     """
@@ -28,7 +28,7 @@ def read_products(skip: int = 0, limit: int = 100) -> Any:
 
 
 @router.get("/{id}", response_model=ProductPublic)
-def read_product(product_id: str) -> Any:
+def read_product(current_user: CurrentUser, product_id: str) -> Any:
     """
     Fetch product by id.
     """
@@ -40,7 +40,7 @@ def read_product(product_id: str) -> Any:
 
 
 @router.post("/", response_model=ProductPublic, status_code=201)
-def create_product(*, product_in: ProductCreate) -> Any:
+def create_product(current_user: CurrentUser, product_in: ProductCreate) -> Any:
     """
     Create new product.
     """
@@ -52,7 +52,7 @@ def create_product(*, product_in: ProductCreate) -> Any:
 
 @router.put("/{id}", response_model=ProductPublic)
 def update_product(
-    *,
+    current_user: CurrentUser,
     product_id: str,
     product_in: ProductUpdate,
 ) -> ProductPublic:
@@ -72,7 +72,7 @@ def update_product(
 
 
 @router.delete("/{id}")
-def delete_product(product_id: str) -> Message:
+def delete_product(current_user: CurrentUser, product_id: str) -> Message:
     """
     Delete a product.
     """
@@ -95,34 +95,32 @@ def get_recommendations(
     purchased_items = session.exec(
         select(Item).where(Item.owner_id == current_user.id)
     ).all()
+
     if not purchased_items:
-        raise HTTPException(
-            status_code=404,
-            detail="You have no recommendations, start buying to get them!",
-        )
+        raise HTTPException(status_code=404, detail="No recommendations available")
 
-    purchased_titles = {item.title for item in purchased_items}
+    purchased_categories = {item.category for item in purchased_items}
+    recommended_products = list(products_collection.find(
+        {"category": {"$in": list(purchased_categories)}},
+        limit=limit
+    ).sort("rating", -1))
 
-    matching_products = products_collection.find(
-        {"title": {"$in": list(purchased_titles)}}
-    )
-    unique_categories = {
-        product["category"] for product in matching_products if "category" in product
-    }
+    if not recommended_products:
+        raise HTTPException(status_code=404, detail="Out of stock")
 
-    if not unique_categories:
-        raise HTTPException(
-            status_code=404, detail="No categories found for matching products!"
-        )
-
-    recommended_products = products_collection.find(
-        {"category": {"$in": list(unique_categories)}}, limit=limit
-    ).sort("rating", -1)
-
-    formatted_products = []
-    for product in recommended_products:
-        product["id"] = str(product["_id"])
-        del product["_id"]
-        formatted_products.append(product)
-
-    return [ProductPublic(**product) for product in formatted_products]
+    try:
+        # Convert MongoDB _id to str and validate
+        return [
+            ProductPublic(
+                id=str(product["_id"]),
+                title=product["title"],
+                description=product.get("description"),
+                category=product["category"],
+                price=product["price"],
+                rating=product["rating"],
+            )
+            for product in recommended_products
+        ]
+    except Exception as e:
+        print(f"Validation failed: {e}")
+        raise HTTPException(status_code=500, detail="Invalid product data")

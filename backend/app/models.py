@@ -71,7 +71,9 @@ class UsersPublic(SQLModel):
 class ItemBase(SQLModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
-
+    category: str | None  = Field(default=None, max_length=255)
+    price: float | None = Field(default=None)
+    rating: float | None = Field(default=None, gt=0, le=5)
 
 # Properties to receive on item creation
 class ItemCreate(ItemBase):
@@ -82,12 +84,11 @@ class ItemCreate(ItemBase):
 class ItemUpdate(SQLModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
-
+    category: str | None = Field(default=None, max_length=255)
 
 # Database model, database table inferred from class name
 class Item(ItemBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    title: str = Field(max_length=255)
 
     owner_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
 
@@ -111,6 +112,7 @@ class ItemsPublic(SQLModel):
 
 class ProductBase(BaseModel):
     title: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
     category: str = Field(max_length=100)
     price: float = Field(gt=0.0)
     rating: float = Field(gt=0.0, le=5)
@@ -125,7 +127,11 @@ class ProductUpdate(ProductBase):
 
 
 class ProductPublic(ProductBase):
-    id: str
+    id: str = Field(alias="_id")
+
+    class Config:
+        # Разрешает загрузку данных с полем _id
+        populate_by_name = True
 
 
 # ======== Token & Security Models ======== #
