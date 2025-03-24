@@ -1,10 +1,10 @@
 🌿 Branch Information
-To run the OpenAI API, please use the test-akira branch.
+To run the OpenAI API, please use the feat/open-ai-chat branch.
 
 📥 Setup Instructions
 After cloning the repository, switch to the correct branch:
 ```bash
-git checkout test-akira
+git checkout feat/open-ai-chat
 ```
 
 Ensure you have Python and pip installed.
