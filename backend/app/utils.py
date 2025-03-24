@@ -121,3 +121,49 @@ def verify_password_reset_token(token: str) -> str | None:
         return str(decoded_token["sub"])
     except InvalidTokenError:
         return None
+
+
+def filter_openai_response(response: dict) -> dict:
+    if not isinstance(response, dict) or "choices" not in response:
+        logging.error("Invalid response format from OpenAI")
+        return {
+            "status": "error",
+            "message": "Error: Invalid response format from OpenAI",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    choices = response.get("choices", [])
+    
+    if not isinstance(choices, list) or len(choices) == 0:
+        logging.error("No choices found in OpenAI response")
+        return {
+            "status": "error",
+            "message": "Error: No response from OpenAI",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    first_choice = choices[0]
+
+    if not isinstance(first_choice, dict) or "message" not in first_choice:
+        logging.error("Invalid message format in OpenAI response")
+        return {
+            "status": "error",
+            "message": "Error: Invalid message format from OpenAI",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    assistant_message = first_choice["message"].get("content", "").strip()
+
+    if not assistant_message:
+        logging.warning("Empty response from OpenAI")
+        return {
+            "status": "error",
+            "message": "Error: Empty response from OpenAI",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    return {
+        "status": "success",
+        "response": assistant_message,
+        "timestamp": datetime.utcnow().isoformat()
+    }
