@@ -183,7 +183,6 @@ def test_update_user_me(
     updated_user = r.json()
     assert updated_user["email"] == email
     assert updated_user["full_name"] == full_name
-
     user_query = select(User).where(User.email == email)
     user_db = db.exec(user_query).first()
     assert user_db
@@ -409,7 +408,7 @@ def test_delete_user_me(client: TestClient, db: Session) -> None:
     assert result is None
 
     user_query = select(User).where(User.id == user_id)
-    user_db = db.execute(user_query).first()
+    user_db = db.exec(user_query).first()
     assert user_db is None
 
 
