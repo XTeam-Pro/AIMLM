@@ -3,7 +3,7 @@ import json
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, List
-
+from datetime import datetime
 
 # ======== User Models ======== #
 
@@ -58,6 +58,17 @@ class User(UserBase, table=True):
         back_populates="owner",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    queries: list["QueryLog"] = Relationship(back_populates="user", cascade_delete=True)
+
+# saving queries from user 
+class QueryLog(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
+    query: str = Field(max_length=500)
+    response: str = Field(max_length=5000)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    user: User | None = Relationship(back_populates="queries")
 
 
 # Properties to return via API, id is always required
