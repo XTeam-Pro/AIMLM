@@ -1,126 +1,158 @@
-from typing import Any
-
+from typing import Any, List
+from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
 
+from app.base_models import (
+    Product,
+    ProductCreate,
+    ProductPublic,
+    Item,
+    Message,
+    ProductUpdate
+)
 from app.api.deps import CurrentUser, SessionDep
-from app.core.mongo_db import products_collection
-from app.models import Item, Message, ProductCreate, ProductPublic, ProductUpdate
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-@router.get("/", response_model=list[ProductPublic])
-def read_products(current_user: CurrentUser, skip: int = 0, limit: int = 100) -> Any:
+@router.get("/", response_model=List[ProductPublic])
+def read_products(
+        session: SessionDep,
+        current_user: CurrentUser,
+        skip: int = 0,
+        limit: int = 100,
+) -> Any:
     """
-    Retrieve products.
+    Retrieve products with optional filtering by category.
     """
-    products_cursor = products_collection.find().skip(skip).limit(limit)
-    products_list = list(products_cursor)
+    query = select(Product)
 
-    if not products_list:
-        raise HTTPException(status_code=404, detail="No products found")
+    if not current_user.is_superuser:
+        query = query.join(Item).where(Item.user_id == current_user.id)
 
-    for product in products_list:
-        product["id"] = str(product["_id"])
-
-    return [ProductPublic(**product) for product in products_list]
+    products = session.exec(query.offset(skip).limit(limit)).all()
+    return products
 
 
-@router.get("/{id}", response_model=ProductPublic)
-def read_product(current_user: CurrentUser, product_id: str) -> Any:
+@router.get("/{product_id}", response_model=ProductPublic)
+def read_product(
+        session: SessionDep,
+        current_user: CurrentUser,
+        product_id: UUID
+) -> Any:
     """
-    Fetch product by id.
+    Get product by ID.
     """
-    product = products_collection.find_one({"_id": product_id})
-    if product is None:
+    product = session.get(Product, product_id)
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    product["id"] = str(product["_id"])
-    return ProductPublic(**product)
+
+    # Check access for non-admin users
+    if not current_user.is_superuser:
+        item = session.exec(
+            select(Item)
+            .where(Item.product_id == product_id)
+            .where(Item.user_id == current_user.id)
+        ).first()
+        if not item:
+            raise HTTPException(status_code=403, detail="No access to this product")
+
+    return product
 
 
 @router.post("/", response_model=ProductPublic, status_code=201)
-def create_product(current_user: CurrentUser, product_in: ProductCreate) -> Any:
+def create_product(
+        session: SessionDep,
+        current_user: CurrentUser,
+        product_in: ProductCreate
+) -> Any:
     """
-    Create new product.
+    Create new product (admin only).
     """
-    product_dict = product_in.model_dump()
-    result = products_collection.insert_one(product_dict)
-    product_dict["id"] = str(result.inserted_id)
-    return ProductPublic(**product_dict)
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    product = Product.model_validate(product_in)
+    session.add(product)
+    session.commit()
+    session.refresh(product)
+    return product
 
 
-@router.put("/{id}", response_model=ProductPublic)
+@router.put("/{product_id}", response_model=ProductPublic)
 def update_product(
-    current_user: CurrentUser,
-    product_id: str,
-    product_in: ProductUpdate,
+        session: SessionDep,
+        current_user: CurrentUser,
+        product_id: UUID,
+        product_in: ProductUpdate,
 ) -> ProductPublic:
-    """
-    Update a product.
-    """
-    product = products_collection.find_one({"_id": product_id})
-    if product is None:
-        raise HTTPException(status_code=404, detail="Product not found")
-    update_data = product_in.model_dump(exclude_unset=True)
-    products_collection.update_one({"_id": product_id}, {"$set": update_data})
-    updated_product = products_collection.find_one({"_id": product_id})
-    if updated_product is None:
-        raise HTTPException(status_code=404, detail="Product not found")
-    updated_product["id"] = str(updated_product["_id"])
-    return ProductPublic(**updated_product)
+    """Update product details (Admin only)"""
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
+    if not (product := session.get(Product, product_id)):
+        raise HTTPException(status_code=404, detail="Product not found")
 
-@router.delete("/{id}")
-def delete_product(current_user: CurrentUser, product_id: str) -> Message:
+    product.sqlmodel_update(product_in.model_dump(exclude_unset=True))
+
+    session.add(product)
+    session.commit()
+    session.refresh(product)
+    return product
+
+@router.delete("/{product_id}", response_model=Message)
+def delete_product(
+        session: SessionDep,
+        current_user: CurrentUser,
+        product_id: UUID,
+) -> Any:
     """
-    Delete a product.
+    Delete product (admin only).
     """
-    product = products_collection.find_one({"_id": product_id})
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    product = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    products_collection.delete_one({"_id": product_id})
+
+    session.delete(product)
+    session.commit()
     return Message(message="Product deleted successfully")
 
 
-@router.get("/recommendations/{limit}", response_model=list[ProductPublic])
+@router.get("/recommendations/{limit}", response_model=List[ProductPublic])
 def get_recommendations(
-    limit: int,
-    current_user: CurrentUser,
-    session: SessionDep,
+        session: SessionDep,
+        current_user: CurrentUser,
+        limit: int = 5
 ) -> Any:
     """
-    Returns a list of recommended products based on items purchased by the user.
+    Get personalized product recommendations based on user's purchase history.
     """
-    purchased_items = session.exec(
-        select(Item).where(Item.owner_id == current_user.id)
+
+    users_items = session.exec(
+        select(Item)
+        .where(Item.user_id == current_user.id)
     ).all()
 
-    if not purchased_items:
-        raise HTTPException(status_code=404, detail="No recommendations available")
+    if not users_items:
 
-    purchased_categories = {item.category for item in purchased_items}
-    recommended_products = list(products_collection.find(
-        {"category": {"$in": list(purchased_categories)}},
-        limit=limit
-    ).sort("rating", -1))
+        products = session.exec(
+            select(Product)
+            .order_by(Product.popularity.desc())
+            .limit(limit)
+        ).all()
+        return products
 
-    if not recommended_products:
-        raise HTTPException(status_code=404, detail="Out of stock")
+    purchased_categories = {item.category for item in users_items if item.category}
 
-    try:
-        # Convert MongoDB _id to str and validate
-        return [
-            ProductPublic(
-                id=str(product["_id"]),
-                title=product["title"],
-                description=product.get("description"),
-                category=product["category"],
-                price=product["price"],
-                rating=product["rating"],
-            )
-            for product in recommended_products
-        ]
-    except Exception as e:
-        print(f"Validation failed: {e}")
-        raise HTTPException(status_code=500, detail="Invalid product data")
+    recommended_products = session.exec(
+        select(Product)
+        .where(Product.category.in_(purchased_categories))
+        .order_by(Product.rating.desc())
+        .limit(limit)
+    ).all()
+
+    return recommended_products

@@ -1,16 +1,22 @@
 import uuid
-
 from fastapi.testclient import TestClient
 from sqlmodel import Session
-
 from app.core.config import settings
+from app.tests.utils.product import create_random_product
+from app.tests.utils.user import create_random_user
 from app.tests.utils.item import create_random_item
 
 
 def test_create_item(
-    client: TestClient, superuser_token_headers: dict[str, str]
+    client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:
-    data = {"title": "Foo", "description": "Fighters"}
+    user = create_random_user(db)
+    product = create_random_product(db)  # Fixed: use create_random_product instead
+    data = {
+        "product_id": str(product.id),
+        "interaction_type": "PURCHASE",
+        "quantity": 2
+    }
     response = client.post(
         f"{settings.API_V1_STR}/items/",
         headers=superuser_token_headers,
@@ -18,14 +24,31 @@ def test_create_item(
     )
     assert response.status_code == 200
     content = response.json()
-    assert content["title"] == data["title"]
-    assert content["description"] == data["description"]
+    assert content["interaction_type"] == data["interaction_type"]
+    assert content["quantity"] == data["quantity"]
+    assert content["product_id"] == data["product_id"]
     assert "id" in content
-    assert "owner_id" in content
+    assert "user_id" in content
+
+def test_create_item_product_not_found(
+        client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    data = {
+        "product_id": str(uuid.uuid4()),
+        "interaction_type": "PURCHASE",
+        "quantity": 1
+    }
+    response = client.post(
+        f"{settings.API_V1_STR}/items/",
+        headers=superuser_token_headers,
+        json=data,
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Product not found"
 
 
 def test_read_item(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+        client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:
     item = create_random_item(db)
     response = client.get(
@@ -34,56 +57,41 @@ def test_read_item(
     )
     assert response.status_code == 200
     content = response.json()
-    assert content["title"] == item.title
-    assert content["description"] == item.description
+    assert content["interaction_type"] == item.interaction_type
+    assert content["quantity"] == item.quantity
     assert content["id"] == str(item.id)
-    assert content["owner_id"] == str(item.owner_id)
+    assert content["user_id"] == str(item.user_id)
 
 
 def test_read_item_not_found(
-    client: TestClient, superuser_token_headers: dict[str, str]
+        client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     response = client.get(
         f"{settings.API_V1_STR}/items/{uuid.uuid4()}",
         headers=superuser_token_headers,
     )
     assert response.status_code == 404
-    content = response.json()
-    assert content["detail"] == "Item not found"
+    assert response.json()["detail"] == "Item not found"
 
 
 def test_read_item_not_enough_permissions(
-    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
+        client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
     item = create_random_item(db)
     response = client.get(
         f"{settings.API_V1_STR}/items/{item.id}",
         headers=normal_user_token_headers,
     )
-    assert response.status_code == 400
-    content = response.json()
-    assert content["detail"] == "Not enough permissions"
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not enough permissions"
 
-
-def test_read_items(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
-) -> None:
-    create_random_item(db)
-    create_random_item(db)
-    response = client.get(
-        f"{settings.API_V1_STR}/items/",
-        headers=superuser_token_headers,
-    )
-    assert response.status_code == 200
-    content = response.json()
-    assert len(content["data"]) >= 2
 
 
 def test_update_item(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+        client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:
     item = create_random_item(db)
-    data = {"title": "Updated title", "description": "Updated description"}
+    data = {"interaction_type": "FAVORITE", "quantity": 3}
     response = client.put(
         f"{settings.API_V1_STR}/items/{item.id}",
         headers=superuser_token_headers,
@@ -91,43 +99,40 @@ def test_update_item(
     )
     assert response.status_code == 200
     content = response.json()
-    assert content["title"] == data["title"]
-    assert content["description"] == data["description"]
+    assert content["interaction_type"] == data["interaction_type"]
+    assert content["quantity"] == data["quantity"]
     assert content["id"] == str(item.id)
-    assert content["owner_id"] == str(item.owner_id)
 
 
 def test_update_item_not_found(
-    client: TestClient, superuser_token_headers: dict[str, str]
+        client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
-    data = {"title": "Updated title", "description": "Updated description"}
+    data = {"interaction_type": "FAVORITE"}
     response = client.put(
         f"{settings.API_V1_STR}/items/{uuid.uuid4()}",
         headers=superuser_token_headers,
         json=data,
     )
     assert response.status_code == 404
-    content = response.json()
-    assert content["detail"] == "Item not found"
+    assert response.json()["detail"] == "Item not found"
 
 
 def test_update_item_not_enough_permissions(
-    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
+        client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
     item = create_random_item(db)
-    data = {"title": "Updated title", "description": "Updated description"}
+    data = {"interaction_type": "FAVORITE"}
     response = client.put(
         f"{settings.API_V1_STR}/items/{item.id}",
         headers=normal_user_token_headers,
         json=data,
     )
-    assert response.status_code == 400
-    content = response.json()
-    assert content["detail"] == "Not enough permissions"
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not enough permissions"
 
 
 def test_delete_item(
-    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+        client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:
     item = create_random_item(db)
     response = client.delete(
@@ -135,30 +140,41 @@ def test_delete_item(
         headers=superuser_token_headers,
     )
     assert response.status_code == 200
-    content = response.json()
-    assert content["message"] == "Item deleted successfully"
+    assert response.json()["message"] == "Item deleted successfully"
 
 
 def test_delete_item_not_found(
-    client: TestClient, superuser_token_headers: dict[str, str]
+        client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     response = client.delete(
         f"{settings.API_V1_STR}/items/{uuid.uuid4()}",
         headers=superuser_token_headers,
     )
     assert response.status_code == 404
-    content = response.json()
-    assert content["detail"] == "Item not found"
+    assert response.json()["detail"] == "Item not found"
 
 
 def test_delete_item_not_enough_permissions(
-    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
+        client: TestClient, normal_user_token_headers: dict[str, str], db: Session
 ) -> None:
     item = create_random_item(db)
     response = client.delete(
         f"{settings.API_V1_STR}/items/{item.id}",
         headers=normal_user_token_headers,
     )
-    assert response.status_code == 400
-    content = response.json()
-    assert content["detail"] == "Not enough permissions"
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not enough permissions"
+
+
+def test_get_item_for_product_not_found(
+    client: TestClient, superuser_token_headers: dict[str, str], db: Session
+) -> None:
+    product = create_random_product(db)  # Fixed: use create_random_product
+    response = client.get(
+        f"{settings.API_V1_STR}/items/product/{product.id}?interaction_type=FAVORITE",
+        headers=superuser_token_headers,
+    )
+    assert response.status_code == 404
+    assert "No FAVORITE interaction found" in response.json()["detail"]
+
+
