@@ -4,6 +4,8 @@ from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 from typing import Optional, List
 from datetime import datetime
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSON 
 
 # ======== User Models ======== #
 
@@ -66,6 +68,7 @@ class QueryLog(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
     query: str = Field(max_length=500)
     response: str = Field(max_length=5000)
+    recommendations: Optional[List[dict]] = Field(default=[], sa_column=Column(JSON)) 
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: User | None = Relationship(back_populates="queries")
