@@ -54,7 +54,6 @@ def read_item(
 
     if not current_user.is_superuser and item.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
-
     return item
 
 
@@ -68,9 +67,18 @@ def create_item(
     """
     Create a new item interaction.
     """
+    item = session.get(Item, item_in.product_id)
+    if item:
+        raise HTTPException(
+            status_code=400,
+            detail="You have already interacted with this item"
+        )
     product = session.get(Product, item_in.product_id)
     if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
     item_data = item_in.model_dump(exclude={"category"})
     item = Item(
         **item_data,

@@ -1,7 +1,9 @@
-from typing import Any, List
+from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException
-from sqlmodel import select
+from sqlalchemy import in_
+from sqlmodel import select, desc
+from sqlalchemy.sql.expression import Select
 
 from app.base_models import (
     Product,
@@ -22,11 +24,11 @@ def read_products(
         current_user: CurrentUser,
         skip: int = 0,
         limit: int = 100,
-) -> Any:
+) -> List[ProductPublic]:
     """
     Retrieve products with optional filtering by category.
     """
-    query = select(Product)
+    query: Select = select(Product)
 
     if not current_user.is_superuser:
         query = query.join(Item).where(Item.user_id == current_user.id)
@@ -40,15 +42,14 @@ def read_product(
         session: SessionDep,
         current_user: CurrentUser,
         product_id: UUID
-) -> Any:
+) -> ProductPublic:
     """
     Get product by ID.
     """
-    product = session.get(Product, product_id)
+    product: Optional[ProductPublic] = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Check access for non-admin users
     if not current_user.is_superuser:
         item = session.exec(
             select(Item)
@@ -57,7 +58,6 @@ def read_product(
         ).first()
         if not item:
             raise HTTPException(status_code=403, detail="No access to this product")
-
     return product
 
 
@@ -66,14 +66,14 @@ def create_product(
         session: SessionDep,
         current_user: CurrentUser,
         product_in: ProductCreate
-) -> Any:
+) -> ProductPublic:
     """
     Create new product (admin only).
     """
     if not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    product = Product.model_validate(product_in)
+    product = ProductPublic.model_validate(product_in)
     session.add(product)
     session.commit()
     session.refresh(product)
@@ -91,7 +91,8 @@ def update_product(
     if not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    if not (product := session.get(Product, product_id)):
+    product: Optional[ProductPublic] = session.get(Product, product_id)
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     product.sqlmodel_update(product_in.model_dump(exclude_unset=True))
@@ -101,19 +102,20 @@ def update_product(
     session.refresh(product)
     return product
 
+
 @router.delete("/{product_id}", response_model=Message)
 def delete_product(
         session: SessionDep,
         current_user: CurrentUser,
         product_id: UUID,
-) -> Any:
+) -> Message:
     """
     Delete product (admin only).
     """
     if not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    product = session.get(Product, product_id)
+    product: Optional[Product] = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -122,36 +124,39 @@ def delete_product(
     return Message(message="Product deleted successfully")
 
 
-@router.get("/recommendations/{limit}", response_model=List[ProductPublic])
+@router.get("/recommendations/{limit}", response_model=list[ProductPublic])
 def get_recommendations(
         session: SessionDep,
         current_user: CurrentUser,
         limit: int = 5
-) -> Any:
+) -> list[ProductPublic]:
     """
     Get personalized product recommendations based on user's purchase history.
     """
-
-    users_items = session.exec(
+    users_items: list[Item] = session.exec(
         select(Item)
         .where(Item.user_id == current_user.id)
     ).all()
 
     if not users_items:
-
-        products = session.exec(
+        products: list[ProductPublic] = session.exec(
             select(Product)
-            .order_by(Product.popularity.desc())
+            .order_by(desc(Product.popularity))
             .limit(limit)
         ).all()
         return products
 
-    purchased_categories = {item.category for item in users_items if item.category}
+    purchased_categories: set[str] = {
+        item.category for item in users_items if item.category
+    }
 
-    recommended_products = session.exec(
+    if not purchased_categories:
+        return []
+
+    recommended_products: list[ProductPublic] = session.exec(
         select(Product)
-        .where(Product.category.in_(purchased_categories))
-        .order_by(Product.rating.desc())
+        .where(in_(Product.category, purchased_categories))
+        .order_by(desc(Product.popularity))
         .limit(limit)
     ).all()
 
