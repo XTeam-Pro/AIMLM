@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from app.core.config import settings
+from app.core.postgres.config import settings
 from app.base_models import User
 
 

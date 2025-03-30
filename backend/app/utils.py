@@ -8,9 +8,10 @@ import emails  # type: ignore
 import jwt
 from jinja2 import Template
 from jwt.exceptions import InvalidTokenError
+from pydantic import EmailStr
 
 from app.core import security
-from app.core.config import settings
+from app.core.postgres.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def render_email_template(*, template_name: str, context: dict[str, Any]) -> str
 
 def send_email(
     *,
-    email_to: str,
+    email_to: EmailStr,
     subject: str = "",
     html_content: str = "",
 ) -> None:
@@ -55,7 +56,7 @@ def send_email(
     logger.info(f"send email result: {response}")
 
 
-def generate_test_email(email_to: str) -> EmailData:
+def generate_test_email(email_to: EmailStr) -> EmailData:
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Test email"
     html_content = render_email_template(
@@ -65,7 +66,7 @@ def generate_test_email(email_to: str) -> EmailData:
     return EmailData(html_content=html_content, subject=subject)
 
 
-def generate_reset_password_email(email_to: str, email: str, token: str) -> EmailData:
+def generate_reset_password_email(email_to: EmailStr, email: EmailStr, token: str) -> EmailData:
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Password recovery for user {email}"
     link = f"{settings.FRONTEND_HOST}/reset-password?token={token}"
@@ -83,7 +84,7 @@ def generate_reset_password_email(email_to: str, email: str, token: str) -> Emai
 
 
 def generate_new_account_email(
-    email_to: str, username: str, password: str
+    email_to: EmailStr, username: str, password: str
 ) -> EmailData:
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - New account for user {username}"
@@ -100,7 +101,7 @@ def generate_new_account_email(
     return EmailData(html_content=html_content, subject=subject)
 
 
-def generate_password_reset_token(email: str) -> str:
+def generate_password_reset_token(email: EmailStr) -> str:
     delta = timedelta(hours=settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS)
     now = datetime.now(timezone.utc)
     expires = now + delta
@@ -113,11 +114,11 @@ def generate_password_reset_token(email: str) -> str:
     return encoded_jwt
 
 
-def verify_password_reset_token(token: str) -> str | None:
+def verify_password_reset_token(token: str) -> EmailStr | None:
     try:
         decoded_token = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
         )
-        return str(decoded_token["sub"])
+        return decoded_token["sub"]
     except InvalidTokenError:
         return None

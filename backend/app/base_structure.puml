@@ -1,0 +1,151 @@
+@startuml Vilavi_Data_Models
+
+' --- Enums ---
+enum UserRole {
+    CLIENT
+    MANAGER
+    MENTOR
+    ADMIN
+}
+
+enum UserStatus {
+    ACTIVE
+    PENDING
+    BLOCKED
+}
+
+enum ProductCategory {
+    COSMETICS
+    NUTRITION
+    COURSE
+    WEBINAR
+    COLLECTION
+}
+
+enum AchievementTier {
+    BRONZE
+    SILVER
+    GOLD
+    PLATINUM
+}
+
+enum InteractionType {
+    VIEW
+    PURCHASE
+    CART_ADD
+    CART_REMOVE
+    FAVORITE
+    WEBINAR_REGISTER
+    WEBINAR_ATTEND
+    ACHIEVEMENT_UNLOCK
+}
+
+enum TransactionType {
+    PURCHASE
+    BONUS
+    PENALTY
+    ACHIEVEMENT
+    REFERRAL
+}
+
+' --- Classes ---
+class TimeZone {
+    + id: int (PK)
+    + name: str
+    + offset: str
+}
+
+class User {
+    + id: uuid (PK)
+    + email: EmailStr
+    + phone: str
+    + role: UserRole
+    + balance: float
+    + mentor_id: uuid (FK)
+    + __tablename__ = "users"
+    --
+    + timezone: TimeZone
+    + mentor: User
+    + transactions: Transaction[]
+    + cart_items: CartItem[]
+}
+
+class Product {
+    + id: uuid (PK)
+    + category: ProductCategory
+    + price: float
+    + __tablename__ = "products"
+    --
+    + interactions: UserProductInteraction[]
+}
+
+class CartItem {
+    + id: uuid (PK)
+    + quantity: int
+    + __tablename__ = "cart_items"
+    --
+    + user: User
+    + product: Product
+}
+
+class Achievement {
+    + id: uuid (PK)
+    + tier: AchievementTier
+    + __tablename__ = "achievements"
+}
+
+class UserAchievement {
+    + progress: float
+    + __tablename__ = "user_achievements"
+    --
+    + user: User
+    + achievement: Achievement
+}
+
+class Webinar {
+    + duration: int
+    + __tablename__ = "webinars"
+    --
+    + product: Product
+}
+
+class UserProductInteraction {
+    + interaction_type: InteractionType
+    + __tablename__ = "user_product_interactions"
+    --
+    + user: User
+    + product: Product
+    + webinar: Webinar
+}
+
+class Transaction {
+    + type: TransactionType
+    + amount: float
+    + __tablename__ = "transactions"
+    --
+    + user: User
+    + product: Product
+    + achievement: Achievement
+}
+
+' --- Relationships ---
+User "1" *-- "0..*" User : mentees
+User "1" --> "1" TimeZone
+User "1" *-- "0..*" Transaction
+User "1" *-- "0..*" CartItem
+User "1" *-- "0..*" UserAchievement
+
+Product "1" *-- "0..*" UserProductInteraction
+Product "1" *-- "0..*" Webinar
+
+CartItem "1" --> "1" Product
+
+UserAchievement "1" --> "1" Achievement
+
+UserProductInteraction "1" --> "0..1" Webinar
+UserProductInteraction "1" --> "0..1" Achievement
+
+Transaction "1" --> "0..1" Product
+Transaction "1" --> "0..1" Achievement
+
+@enduml

@@ -1,163 +1,105 @@
-from typing import List, Optional
+from typing import  Any
 from uuid import UUID
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import in_
-from sqlmodel import select, desc
-from sqlalchemy.sql.expression import Select
-
-from app.base_models import (
-    Product,
-    ProductCreate,
-    ProductPublic,
-    Item,
-    Message,
-    ProductUpdate
-)
-from app.api.deps import CurrentUser, SessionDep
-
-router = APIRouter(prefix="/products", tags=["products"])
+from pydantic import BaseModel
 
 
-@router.get("/", response_model=List[ProductPublic])
+from app.api.deps import CurrentUser, CommittedSessionDep, UncommittedSessionDep
+from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO
+from app.schemas.core_schemas import ProductPublic, ProductCreate, ProductUpdate, Message, UserRole
+
+router = APIRouter(prefix="/product", tags=["products"])
+
+class SearchFilter(BaseModel):
+    skip: int = 0
+    limit: int = 100
+
+
+@router.get("/", response_model=list[ProductPublic])
 def read_products(
-        session: SessionDep,
+        session: UncommittedSessionDep,
         current_user: CurrentUser,
         skip: int = 0,
-        limit: int = 100,
-) -> List[ProductPublic]:
-    """
-    Retrieve products with optional filtering by category.
-    """
-    query: Select = select(Product)
-
-    if not current_user.is_superuser:
-        query = query.join(Item).where(Item.user_id == current_user.id)
-
-    products = session.exec(query.offset(skip).limit(limit)).all()
-    return products
+        limit: int = 100
+) -> Any:
+    """Retrieve products with optional filtering by category."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No access to this method")
+    return ProductDAO(session).find_all(skip, limit)
 
 
 @router.get("/{product_id}", response_model=ProductPublic)
 def read_product(
-        session: SessionDep,
+        session: UncommittedSessionDep,
         current_user: CurrentUser,
         product_id: UUID
-) -> ProductPublic:
-    """
-    Get product by ID.
-    """
-    product: Optional[ProductPublic] = session.get(Product, product_id)
+) -> Any:
+    """Get product by ID."""
+    product = ProductDAO(session).find_one_or_none_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    if not current_user.is_superuser:
-        item = session.exec(
-            select(Item)
-            .where(Item.product_id == product_id)
-            .where(Item.user_id == current_user.id)
-        ).first()
-        if not item:
+    if current_user.role != "admin":
+        interactions = UserProductInteractionDAO(session).find_all(filters=
+            {
+                "user_id": current_user.id,
+                "product_id": product_id
+        })
+        if not interactions:
             raise HTTPException(status_code=403, detail="No access to this product")
     return product
 
 
 @router.post("/", response_model=ProductPublic, status_code=201)
 def create_product(
-        session: SessionDep,
+        session: CommittedSessionDep,
         current_user: CurrentUser,
         product_in: ProductCreate
-) -> ProductPublic:
-    """
-    Create new product (admin only).
-    """
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not authorized")
+) -> Any:
+    """Create new product (admin only)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if ProductDAO(session).find_one_or_none_by_id(product_in.id):
+        raise HTTPException(status_code=409, detail=f"Shaver {product_in.title} already exists ")
 
-    product = ProductPublic.model_validate(product_in)
-    session.add(product)
-    session.commit()
-    session.refresh(product)
-    return product
+    return ProductDAO(session).add(product_in)
 
 
 @router.put("/{product_id}", response_model=ProductPublic)
 def update_product(
-        session: SessionDep,
+        session: CommittedSessionDep,
         current_user: CurrentUser,
         product_id: UUID,
         product_in: ProductUpdate,
-) -> ProductPublic:
+) -> Any:
     """Update product details (Admin only)"""
-    if not current_user.is_superuser:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    product: Optional[ProductPublic] = session.get(Product, product_id)
+    product_dao = ProductDAO(session)
+    product = product_dao.find_one_or_none_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    product.sqlmodel_update(product_in.model_dump(exclude_unset=True))
-
-    session.add(product)
-    session.commit()
-    session.refresh(product)
-    return product
+    return product_dao.update({"id": product_id}, product_in)
 
 
 @router.delete("/{product_id}", response_model=Message)
 def delete_product(
-        session: SessionDep,
+        session: CommittedSessionDep,
         current_user: CurrentUser,
         product_id: UUID,
-) -> Message:
+) -> Any:
     """
     Delete product (admin only).
     """
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
 
-    product: Optional[Product] = session.get(Product, product_id)
+    product = ProductDAO(session).find_one_or_none_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-
-    session.delete(product)
-    session.commit()
+    ProductDAO(session).delete({"id": product.id})
     return Message(message="Product deleted successfully")
 
 
-@router.get("/recommendations/{limit}", response_model=list[ProductPublic])
-def get_recommendations(
-        session: SessionDep,
-        current_user: CurrentUser,
-        limit: int = 5
-) -> list[ProductPublic]:
-    """
-    Get personalized product recommendations based on user's purchase history.
-    """
-    users_items: list[Item] = session.exec(
-        select(Item)
-        .where(Item.user_id == current_user.id)
-    ).all()
-
-    if not users_items:
-        products: list[ProductPublic] = session.exec(
-            select(Product)
-            .order_by(desc(Product.popularity))
-            .limit(limit)
-        ).all()
-        return products
-
-    purchased_categories: set[str] = {
-        item.category for item in users_items if item.category
-    }
-
-    if not purchased_categories:
-        return []
-
-    recommended_products: list[ProductPublic] = session.exec(
-        select(Product)
-        .where(in_(Product.category, purchased_categories))
-        .order_by(desc(Product.popularity))
-        .limit(limit)
-    ).all()
-
-    return recommended_products

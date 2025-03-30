@@ -4,13 +4,16 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import EmailStr
 
 from app import crud
-from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
+from app.api.deps import CurrentUser, get_current_active_superuser, UncommittedSessionDep, CommittedSessionDep
 from app.core import security
-from app.core.config import settings
+from app.core.postgres.config import settings
+from app.core.postgres.dao import UserDAO
 from app.core.security import get_password_hash
-from app.base_models import Message, NewPassword, Token, UserPublic
+from app.schemas.core_schemas import Token, UserPublic, Message, NewPassword, UserStatus
+
 from app.utils import (
     generate_password_reset_token,
     generate_reset_password_email,
@@ -23,25 +26,32 @@ router = APIRouter(tags=["login"])
 
 @router.post("/login/access-token")
 def login_access_token(
-    session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+        session: UncommittedSessionDep,
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ) -> Token:
     """
     OAuth2 compatible token login, get an access token for future requests
     """
-    user = crud.authenticate(
-        session=session, email=form_data.username, password=form_data.password
+    # Authenticate user through DAO
+    user_dao = UserDAO(session)
+    user = user_dao.authenticate(
+        email=form_data.username,
+        password=form_data.password
     )
+
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
-    elif not user.is_active:
+    if user.status == UserStatus.INACTIVE:
         raise HTTPException(status_code=400, detail="Inactive user")
+
+    # Generate token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return Token(
         access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
+            user.id,
+            expires_delta=access_token_expires
         )
     )
-
 
 @router.post("/login/test-token", response_model=UserPublic)
 def test_token(current_user: CurrentUser) -> Any:
@@ -52,7 +62,7 @@ def test_token(current_user: CurrentUser) -> Any:
 
 
 @router.post("/password-recovery/{email}")
-def recover_password(email: str, session: SessionDep) -> Message:
+def recover_password(email: EmailStr, session: CommittedSessionDep) -> Message:
     """
     Password Recovery
     """
@@ -76,7 +86,7 @@ def recover_password(email: str, session: SessionDep) -> Message:
 
 
 @router.post("/reset-password/")
-def reset_password(session: SessionDep, body: NewPassword) -> Message:
+def reset_password(session: CommittedSessionDep, body: NewPassword) -> Message:
     """
     Reset password
     """
@@ -103,7 +113,7 @@ def reset_password(session: SessionDep, body: NewPassword) -> Message:
     dependencies=[Depends(get_current_active_superuser)],
     response_class=HTMLResponse,
 )
-def recover_password_html_content(email: str, session: SessionDep) -> Any:
+def recover_password_html_content(email: EmailStr, session: CommittedSessionDep) -> Any:
     """
     HTML Content for Password Recovery
     """

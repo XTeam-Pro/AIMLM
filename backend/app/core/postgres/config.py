@@ -53,8 +53,9 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "string123"
+    POSTGRES_PASSWORD: str = "1234"
     POSTGRES_DB: str = "app"
+    REDIS_URL: str = "http://localhost:6379"
     MONGO_URL: str = "mongodb://mongo_db:27017/"
     MONGO_DB: str = "vilavi_shop_db"
     MONGO_INIT: int = 1

@@ -1,16 +1,15 @@
 import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
-from app.core.config import settings
+from app.core.postgres.config import settings
 from app.tests.utils.product import create_random_product
-from app.tests.utils.user import create_random_user
+
 from app.tests.utils.item import create_random_item
 
 
 def test_create_item(
     client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:
-    user = create_random_user(db)
     product = create_random_product(db)  # Fixed: use create_random_product instead
     data = {
         "product_id": str(product.id),
