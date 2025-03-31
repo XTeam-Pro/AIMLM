@@ -5,7 +5,8 @@ from sqlmodel import Session, select
 
 from app.core.postgres.config import settings
 from app.core.security import verify_password
-from app.base_models import User
+from app.models.core import User
+
 from app.utils import generate_password_reset_token
 
 

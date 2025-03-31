@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Any, Dict
 
-from pydantic import EmailStr
 from sqlalchemy import JSON
 from sqlmodel import SQLModel, Field, Relationship
 

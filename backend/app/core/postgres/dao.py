@@ -1,5 +1,5 @@
 from typing import Optional
-
+from uuid import UUID
 
 from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
@@ -17,6 +17,15 @@ class UserDAO(BaseDAO[User]):
         if not verify_password(password, user.hashed_password):
             return None
         return user
+
+    def update_balance(self, user_id: UUID, amount: float) -> User:
+        """Atomic user balance update"""
+        user = self.find_one_or_none_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        user.balance += amount
+        return self.update({"id": user_id}, {"balance": user.balance})
 
 class ProductDAO(BaseDAO[Product]):
     model = Product

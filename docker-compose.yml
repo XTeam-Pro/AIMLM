@@ -32,6 +32,26 @@ services:
       - "27017:27017"
     env_file:
       - .env
+      -
+  redis:
+    image: redis:latest
+    restart: always
+    networks:
+      - traefik-public
+      - default
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    env_file:
+      - .env
+    environment:
+       - REDIS_URL=${REDIS_URL?Variable not set}
 
   adminer:
     image: adminer
@@ -90,6 +110,7 @@ services:
       - MONGO_INIT=${MONGO_INIT?Variable not set}
       - MONGO_URL=${MONGO_URL?Variable not set}
       - MONGO_DB=${MONGO_DB?Variable not set}
+      - REDIS_URL=${REDIS_URL?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
 
   backend:
@@ -100,6 +121,9 @@ services:
       - default
     depends_on:
       db:
+        condition: service_healthy
+        restart: true
+      redis:
         condition: service_healthy
         restart: true
       prestart:

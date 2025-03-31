@@ -10,10 +10,6 @@ from app.schemas.core_schemas import ProductPublic, ProductCreate, ProductUpdate
 
 router = APIRouter(prefix="/product", tags=["products"])
 
-class SearchFilter(BaseModel):
-    skip: int = 0
-    limit: int = 100
-
 
 @router.get("/", response_model=list[ProductPublic])
 def read_products(

@@ -2,7 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from random import choice, randint
 from sqlmodel import Session
-from app.base_models import Item
+
+from app.models.core import UserProductInteraction
 from app.tests.utils.user import create_random_user
 from app.tests.utils.product import create_random_product
 
@@ -12,7 +13,7 @@ def create_random_item(
         user_id: uuid.UUID | None = None,
         product_id: uuid.UUID | None = None,
         **kwargs
-) -> Item:
+) -> UserProductInteraction:
     """
     Create and return a random Item for testing.
 
@@ -46,7 +47,7 @@ def create_random_item(
     }
 
     # Create and commit the item
-    item = Item(**item_data)
+    item = UserProductInteraction(**item_data)
     db.add(item)
     db.commit()
     db.refresh(item)

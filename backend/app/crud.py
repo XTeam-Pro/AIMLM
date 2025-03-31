@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import EmailStr
 from sqlmodel import Session, select
 
-from app.core.security import get_password_hash, verify_password
+from app.core.security import get_password_hash
 from app.models.core import User
 from app.schemas.core_schemas import UserCreate, UserUpdate
 
@@ -34,21 +34,10 @@ def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
     return db_user
 
 
-def get_user_by_email(*, session: Session, email: EmailStr) -> User | None:
+def get_user_by_email(*, session: Session, email: str) -> User | None:
     statement = select(User).where(User.email == email)
     session_user = session.exec(statement).first()
     return session_user
-
-
-
-
-def authenticate(*, session: Session, email: EmailStr, password: str) -> User | None:
-    db_user = get_user_by_email(session=session, email=email)
-    if not db_user:
-        return None
-    if not verify_password(password, db_user.hashed_password):
-        return None
-    return db_user
 
 
 

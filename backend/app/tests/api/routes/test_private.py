@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.core.postgres.config import settings
-from app.base_models import User
+from app.core.postgres.dao import UserDAO
 
 
 def test_create_user(client: TestClient, db: Session) -> None:
@@ -19,7 +19,7 @@ def test_create_user(client: TestClient, db: Session) -> None:
 
     data = r.json()
 
-    user = db.exec(select(User).where(User.id == data["id"])).first()
+    user = UserDAO(db).find_one_or_none_by_id(data["id"])
 
     assert user
     assert user.email == "pollo@listo.com"

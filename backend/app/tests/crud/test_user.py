@@ -1,10 +1,10 @@
-import uuid
+
 from fastapi.encoders import jsonable_encoder
 from sqlmodel import Session
 
 from app.core.security import verify_password
-from app.models.core import User
-from app.schemas.core_schemas import UserCreate, UserUpdate, UserRegister, NewPassword
+
+from app.schemas.core_schemas import UserCreate, UserUpdate, UserRegister
 from app.core.postgres.dao import UserDAO
 from app.tests.utils.utils import random_email, random_lower_string, random_phone
 
@@ -16,6 +16,18 @@ def create_test_user_data():
         "phone": random_phone(),
         "full_name": "Test User",
         "hashed_password": "ValidPass1",
+        "address": "123 Main St, New York",
+        "postcode": "10001",
+    }
+
+def create_test_admin_data():
+    return {
+        "email": random_email(),
+        "username": "testadmin",
+        "phone": random_phone(),
+        "full_name": "Test User",
+        "hashed_password": "ValidPass1",
+        "role": "admin",
         "address": "123 Main St, New York",
         "postcode": "10001",
     }

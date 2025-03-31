@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
+from email_validator import validate_email, EmailNotValidError
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 
 from app.models.core import User
@@ -48,6 +49,7 @@ class UserRole(str, Enum):
     CLIENT = "client"
     MANAGER = "manager"
     MENTOR = "mentor"
+    DISTRIBUTOR = "distributor"
     ADMIN = "admin"
 
 
@@ -115,8 +117,21 @@ class UserBase(BaseModel):
     phone: str = Field(..., max_length=20, pattern=r"^\+?[1-9]\d{1,14}$")
     full_name: str = Field(..., max_length=100)
 
+    @field_validator('email')
+    def validate_email_rfc(cls, v):
+
+        try:
+            result = validate_email(v, check_deliverability=False)
+            blocked_domains = {'tempmail.com', 'example.com'} # This array can be expanded over time
+            domain = v.split('@')[-1]
+            if domain in blocked_domains:
+                raise ValueError('Disposable emails are not allowed')
+            return result.normalized
+        except EmailNotValidError as e:
+            raise ValueError(str(e))
+
 class UserRegister(UserBase):
-    hashed_password: str = Field(..., min_length=8, max_length=64)
+    hashed_password: str = Field(..., min_length=8, max_length=64, examples=["String123"])
     address: str = Field(...,
                          min_length=5,
                          max_length=200,
@@ -169,11 +184,6 @@ class UserRegister(UserBase):
             raise ValueError('Phone too short')
         return v
 
-    @field_validator('email')
-    def validate_email_domain(cls, v):
-        if 'example.com' in v:
-            raise ValueError('Example.com domain is not allowed')
-        return v
 
 
 class UserCreate(UserRegister):
@@ -304,6 +314,8 @@ class TransactionBase(BaseModel):
 
 class TransactionCreate(TransactionBase):
     product_id: Optional[uuid.UUID] = Field(...)
+    status: TransactionStatus = Field(..., )
+
     achievement_id: Optional[uuid.UUID] = Field(default=None)
     user_id: uuid.UUID = Field(...)
 

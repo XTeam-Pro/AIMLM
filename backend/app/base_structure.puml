@@ -1,151 +1,144 @@
-@startuml Vilavi_Data_Models
+@startuml ecommerce_models
 
-' --- Enums ---
-enum UserRole {
-    CLIENT
-    MANAGER
-    MENTOR
-    ADMIN
+' Настройки диаграммы
+hide circle
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam class {
+    BackgroundColor White
+    ArrowColor #0078D7
+    BorderColor #0078D7
 }
 
-enum UserStatus {
-    ACTIVE
-    PENDING
-    BLOCKED
-}
+' Определение классов
 
-enum ProductCategory {
-    COSMETICS
-    NUTRITION
-    COURSE
-    WEBINAR
-    COLLECTION
-}
-
-enum AchievementTier {
-    BRONZE
-    SILVER
-    GOLD
-    PLATINUM
-}
-
-enum InteractionType {
-    VIEW
-    PURCHASE
-    CART_ADD
-    CART_REMOVE
-    FAVORITE
-    WEBINAR_REGISTER
-    WEBINAR_ATTEND
-    ACHIEVEMENT_UNLOCK
-}
-
-enum TransactionType {
-    PURCHASE
-    BONUS
-    PENALTY
-    ACHIEVEMENT
-    REFERRAL
-}
-
-' --- Classes ---
 class TimeZone {
     + id: int (PK)
     + name: str
     + offset: str
 }
 
-class User {
-    + id: uuid (PK)
-    + email: EmailStr
+class UserBase {
+    <<Abstract>>
+    + email: str
     + phone: str
-    + role: UserRole
+    + username: str
+    + full_name: str
+    + postcode: str
+    + address: str
+    + role: str
+    + status: str
+    + timezone_id: Optional[int] (FK)
+    + mentor_id: Optional[uuid.UUID] (FK)
     + balance: float
-    + mentor_id: uuid (FK)
-    + __tablename__ = "users"
-    --
-    + timezone: TimeZone
-    + mentor: User
-    + transactions: Transaction[]
-    + cart_items: CartItem[]
+    + registration_date: datetime
+}
+
+class User {
+    + id: uuid.UUID (PK)
+    + hashed_password: str
 }
 
 class Product {
-    + id: uuid (PK)
-    + category: ProductCategory
+    + id: uuid.UUID (PK)
+    + title: str
+    + description: str
+    + category: str
     + price: float
-    + __tablename__ = "products"
-    --
-    + interactions: UserProductInteraction[]
+    + points_value: float
+    + image_url: str
+    + webinar_link: str
+    + is_active: bool
+    + is_collection: bool
+    + collection_items: Optional[List[Dict]]
+    + created_at: datetime
 }
 
 class CartItem {
-    + id: uuid (PK)
+    + id: uuid.UUID (PK)
+    + user_id: uuid.UUID (FK)
+    + product_id: uuid.UUID (FK)
     + quantity: int
-    + __tablename__ = "cart_items"
-    --
-    + user: User
-    + product: Product
-}
-
-class Achievement {
-    + id: uuid (PK)
-    + tier: AchievementTier
-    + __tablename__ = "achievements"
-}
-
-class UserAchievement {
-    + progress: float
-    + __tablename__ = "user_achievements"
-    --
-    + user: User
-    + achievement: Achievement
-}
-
-class Webinar {
-    + duration: int
-    + __tablename__ = "webinars"
-    --
-    + product: Product
+    + added_at: datetime
 }
 
 class UserProductInteraction {
-    + interaction_type: InteractionType
-    + __tablename__ = "user_product_interactions"
-    --
-    + user: User
-    + product: Product
-    + webinar: Webinar
+    + id: uuid.UUID (PK)
+    + user_id: uuid.UUID (FK)
+    + product_id: Optional[uuid.UUID] (FK)
+    + interaction_type: str
+    + points_awarded: float
+    + interaction_date: datetime
+    + achievement_id: Optional[uuid.UUID] (FK)
+    + additional_info: Optional[Dict]
 }
 
 class Transaction {
-    + type: TransactionType
+    + id: uuid.UUID (PK)
+    + user_id: uuid.UUID (FK)
     + amount: float
-    + __tablename__ = "transactions"
-    --
-    + user: User
-    + product: Product
-    + achievement: Achievement
+    + points: float
+    + type: str
+    + status: str
+    + product_id: Optional[uuid.UUID] (FK)
+    + achievement_id: Optional[uuid.UUID] (FK)
+    + created_at: datetime
+    + additional_info: Dict
 }
 
-' --- Relationships ---
-User "1" *-- "0..*" User : mentees
-User "1" --> "1" TimeZone
-User "1" *-- "0..*" Transaction
-User "1" *-- "0..*" CartItem
-User "1" *-- "0..*" UserAchievement
+class Achievement {
+    + id: uuid.UUID (PK)
+    + name: str
+    + description: str
+    + points: float
+    + image_url: str
+}
 
-Product "1" *-- "0..*" UserProductInteraction
-Product "1" *-- "0..*" Webinar
+class UserAchievement {
+    + id: uuid.UUID (PK)
+    + user_id: uuid.UUID (FK)
+    + achievement_id: uuid.UUID (FK)
+    + achieved_at: datetime
+}
 
-CartItem "1" --> "1" Product
+' Наследование
+UserBase <|-- User
 
-UserAchievement "1" --> "1" Achievement
+' Связи между классами
 
-UserProductInteraction "1" --> "0..1" Webinar
-UserProductInteraction "1" --> "0..1" Achievement
+User "1" *-- "0..*" CartItem : "has"
+Product "1" *-- "0..*" CartItem : "in"
 
-Transaction "1" --> "0..1" Product
-Transaction "1" --> "0..1" Achievement
+User "1" *-- "0..*" Transaction : "has"
+Product "0..1" *-- "0..*" Transaction : "in"
+Achievement "0..1" *-- "0..*" Transaction : "triggers"
+
+User "1" *-- "0..*" UserProductInteraction : "has"
+Product "0..1" *-- "0..*" UserProductInteraction : "interacted with"
+Achievement "0..1" *-- "0..*" UserProductInteraction : "awards"
+
+User "0..1" *-- "0..*" User : "mentors"
+TimeZone "0..1" *-- "0..*" User : "has"
+
+User "1" *-- "0..*" UserAchievement : "has"
+Achievement "1" *-- "0..*" UserAchievement : "awarded in"
+
+' Примечания
+note top of User
+  Может быть ментором для других пользователей
+  (self-referential relationship)
+end note
+
+note right of Product
+  Может быть коллекцией товаров
+  (collection_items содержит список товаров)
+end note
+
+note left of Transaction
+  Может быть связана с:
+  - Покупкой товара
+  - Начислением баллов
+  - Достижением
+end note
 
 @enduml

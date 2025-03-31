@@ -1,15 +1,34 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app import crud
 from app.core.postgres.config import settings
-from app.base_models import User, UserCreate, UserUpdate
-from app.tests.utils.utils import random_email, random_lower_string
+from app.core.postgres.dao import UserDAO
+
+from app.schemas.core_schemas import UserRegister
+from app.models.core import User
+from app.tests.utils.utils import random_email,  random_phone
+
+
+def create_test_user_data(role="client", status="active"):
+    """Generates fake user data"""
+    return {
+        "email": random_email(),
+        "username": "testuser",
+        "phone": random_phone(),
+        "full_name": "Test User",
+        "hashed_password": "ValidPass1",  # Пароль должен соответствовать валидации
+        "address": "123 Main St, New York",
+        "postcode": "10001",
+        "role": role,
+        "status": status,
+        "balance": 0.0
+    }
 
 
 def user_authentication_headers(
-    *, client: TestClient, email: str, password: str
+        *, client: TestClient, email: str, password: str
 ) -> dict[str, str]:
+    """Gets headers with auth token"""
     data = {"username": email, "password": password}
 
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=data)
@@ -20,30 +39,42 @@ def user_authentication_headers(
 
 
 def create_random_user(db: Session) -> User:
-    email = random_email()
-    password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
-    user = crud.create_user(session=db, user_create=user_in)
+    """Creates a random user"""
+    user_data = create_test_user_data()
+    user_in = UserRegister(**user_data)
+    user_dao = UserDAO(db)
+    user = user_dao.add(user_in)
     return user
 
 
 def authentication_token_from_email(
-    *, client: TestClient, email: str, db: Session
+        *, client: TestClient, email: str, db: Session
 ) -> dict[str, str]:
     """
-    Return a valid token for the user with given email.
-
-    If the user doesn't exist it is created first.
+    Gets auth token for user with the specified email.
+    If user doesn't exist it creates him.
     """
-    password = random_lower_string()
-    user = crud.get_user_by_email(session=db, email=email)
+    password = "ValidPass1"  # Пароль должен соответствовать валидации
+
+    user_dao = UserDAO(db)
+    user = user_dao.find_one_or_none({"email": email})
+
     if not user:
-        user_in_create = UserCreate(email=email, password=password)
-        user = crud.create_user(session=db, user_create=user_in_create)
+        user_data = create_test_user_data()
+        user_data["email"] = email
+        user_data["hashed_password"] = password
+        user_in = UserRegister(**user_data)
+        user_dao.add(user_in)
     else:
-        user_in_update = UserUpdate(password=password)
-        if not user.id:
-            raise Exception("User id not set")
-        user = crud.update_user(session=db, db_user=user, user_in=user_in_update)
+        user_dao.update({"id": user.id}, {"hashed_password": password})
 
     return user_authentication_headers(client=client, email=email, password=password)
+
+
+def get_superuser_headers(client: TestClient, db: Session) -> dict[str, str]:
+    """Gets superuser's headers"""
+    return authentication_token_from_email(
+        client=client,
+        email=settings.FIRST_SUPERUSER,
+        db=db
+    )

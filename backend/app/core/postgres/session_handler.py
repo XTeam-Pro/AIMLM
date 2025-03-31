@@ -1,6 +1,14 @@
-from typing import Generator
+from __future__ import annotations
+from typing import Generator, TYPE_CHECKING
 from sqlmodel import Session
-from app.core.postgres.db import engine
+
+from app.core.postgres.db_engine import engine
+
+
+#
+# if TYPE_CHECKING:
+#     """Prevents circular import"""
+
 
 def get_session_with_commit() -> Generator[Session, None, None]:
     """Session with automatic commit."""

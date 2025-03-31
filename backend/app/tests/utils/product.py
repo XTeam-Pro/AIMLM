@@ -1,7 +1,9 @@
 import uuid
 from sqlmodel import Session
-from app.base_models import Product
+
 from random import randint, choice
+
+from app.models.core import Product
 
 
 def create_random_product(db: Session, **kwargs) -> Product:

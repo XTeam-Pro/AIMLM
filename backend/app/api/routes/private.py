@@ -24,7 +24,7 @@ def create_user(user_in: UserCreate, session: CommittedSessionDep) -> Any:
         username=user_in.username,
         full_name=user_in.full_name,
         phone=user_in.phone,
-        hashed_password=get_password_hash(user_in.password),
+        hashed_password=get_password_hash(user_in.hashed_password),
         postcode=user_in.postcode,
         address=user_in.address,
         balance=user_in.balance,

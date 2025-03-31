@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field, Relationship
 from app.schemas.gamification_schemas import AchievementTier
 if TYPE_CHECKING:
+    """Prevents circular import"""
     from app.models.core import User
 
 

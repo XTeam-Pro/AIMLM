@@ -1,10 +1,8 @@
 import uuid
-from typing import List, TypeVar, Generic, Type, Optional, cast, Any
+from typing import List, TypeVar, Generic, Type, Optional, Dict, Any, Union
 from pydantic import BaseModel
 import logging
-
-from sqlalchemy import Select
-from sqlmodel import SQLModel, Session, select, update, delete, func, col
+from sqlmodel import SQLModel, Session, select, delete, func, and_
 
 
 T = TypeVar("T", bound=SQLModel)
@@ -21,25 +19,41 @@ class BaseDAO(Generic[T]):
         if self.model is None:
             raise ValueError("Model must be specified in the child class")
 
+    def _validate_fields(self, filters: Dict[str, Any]) -> None:
+        """Model field name validation (SQL injection protection)"""
+        valid_fields = self.model.model_fields.keys()
+        for field in filters.keys():
+            if field not in valid_fields:
+                raise ValueError(f"Invalid field name: '{field}'")
 
     def find_one_or_none_by_id(self, data_id: uuid.UUID | str) -> Optional[T]:
-        """Find a record by its ID."""
+        """Find a record by its ID using SQLModel methods."""
         try:
-            query = cast(Select[T], select(self.model).where(self.model.id == data_id))
-            return self._session.exec(query).first()
+            statement = select(self.model).where(self.model.id == data_id)
+            result = self._session.exec(statement).first()
+            return result
         except Exception as e:
             logger.error(f"Error finding record by ID {data_id}: {str(e)}")
+            self._session.rollback()
             raise
 
-    def find_one_or_none(self, filters: dict) -> Optional[T]:
+    def find_one_or_none(self, filters: Dict[str, Any]) -> Optional[T]:
         """Find a single record matching the filters."""
         try:
-            query = select(self.model)
+            self._validate_fields(filters)
+            statement = select(self.model)
+
+            conditions = []
             for field, value in filters.items():
-                query = query.where(getattr(self.model, field) == value)
-            return self._session.exec(query).first()
+                conditions.append(getattr(self.model, field) == value)
+
+            if conditions:
+                statement = statement.where(and_(*conditions))
+
+            return self._session.exec(statement).first()
         except Exception as e:
-            logger.error(f"Error finding record with filters: {str(e)}")
+            logger.error(f"Error finding record with filters {filters}: {str(e)}")
+            self._session.rollback()
             raise
 
     def add(self, values: BaseModel) -> T:
@@ -63,34 +77,59 @@ class BaseDAO(Generic[T]):
             new_instances = [self.model(**inst) for inst in values_list]
             self._session.add_all(new_instances)
             self._session.flush()
+
+            # Refresh all instances
+            for instance in new_instances:
+                self._session.refresh(instance)
+
             return new_instances
         except Exception as e:
             self._session.rollback()
             logger.error(f"Error adding multiple records: {str(e)}")
             raise
 
-    def find_all(self, skip: int = 0, limit: int = 100, filters: dict = None) -> List[T]:
+    def find_all(
+            self,
+            skip: int = 0,
+            limit: int = 100,
+            filters: Optional[Dict[str, Any]] = None
+    ) -> List[T]:
         """Get all records matching optional filters."""
         try:
-            query = select(self.model)
+            if limit > 1000:
+                raise ValueError("Limit cannot exceed 1000")
+
+            statement = select(self.model)
+
             if filters:
+                self._validate_fields(filters)
+                conditions = []
                 for field, value in filters.items():
-                    if value is not None:  # Skip None values
-                        query = query.where(getattr(self.model, field) == value)
+                    if value is not None:
+                        conditions.append(getattr(self.model, field) == value)
 
-            query = query.offset(skip).limit(limit)
+                if conditions:
+                    statement = statement.where(and_(*conditions))
 
-            result = self._session.exec(query)
+            statement = statement.offset(skip).limit(limit)
+            result = self._session.exec(statement)
             return list(result.all())
-
         except Exception as e:
-            logger.error(f"Error fetching records (skip={skip}, limit={limit}): {str(e)}")
+            logger.error(f"Error fetching records: {str(e)}")
+            self._session.rollback()
             raise
 
-    def update(self, filters: dict, values: BaseModel | dict[str, Any]) -> T:
+    def update(
+            self,
+            filters: Dict[str, Any],
+            values: Union[BaseModel, Dict[str, Any]]
+    ) -> T:
         """Update records matching filters and return updated entity"""
         try:
+            self._validate_fields(filters)
+
             values_dict = values.model_dump(exclude_unset=True) if isinstance(values, BaseModel) else values
+            self._validate_fields(values_dict)
 
             entity = self.find_one_or_none(filters)
             if not entity:
@@ -103,42 +142,52 @@ class BaseDAO(Generic[T]):
             self._session.flush()
             self._session.refresh(entity)
             return entity
-
         except Exception as e:
             self._session.rollback()
             logger.error(f"Error updating record: {str(e)}")
             raise
 
-    def delete(self, filters: dict = None) -> int:
+    def delete(self, filters: Union[BaseModel, Dict[str, Any]]) -> int:
         """Delete records matching filters."""
         try:
+            if isinstance(filters, BaseModel):
+                filters = filters.model_dump(exclude_unset=True)
+            elif not isinstance(filters, dict):
+                raise ValueError("Filters must be a dict or BaseModel")
 
             if not filters:
                 raise ValueError("At least one filter is required for deletion")
 
-            stmt = delete(self.model)
+            self._validate_fields(filters)
+            conditions = []
             for field, value in filters.items():
-                stmt = stmt.where(getattr(self.model, field) == value)
+                conditions.append(getattr(self.model, field) == value)
 
-            result = self._session.exec(stmt)
+            statement = delete(self.model).where(and_(*conditions))
+            result = self._session.exec(statement)
             self._session.flush()
-
-            # Get the number of affected rows
-            return result.rowcount if hasattr(result, 'rowcount') else 0
+            return result.rowcount
         except Exception as e:
             self._session.rollback()
-            logger.error(f"Error deleting records: {str(e)}")
+            logger.error(f"Delete error: {str(e)}")
             raise
 
-    def count(self, filters: Optional[BaseModel] = None) -> int:
+    def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """Count records matching optional filters."""
         try:
-            query = select(func.count()).select_from(self.model)
+            statement = select(func.count()).select_from(self.model)
+
             if filters:
-                filter_dict = filters.model_dump(exclude_unset=True)
-                for field, value in filter_dict.items():
-                    query = query.where(col(getattr(self.model, field)) == value)
-            return self._session.exec(query).one()
+                self._validate_fields(filters)
+                conditions = []
+                for field, value in filters.items():
+                    conditions.append(getattr(self.model, field) == value)
+
+                if conditions:
+                    statement = statement.where(and_(*conditions))
+
+            return self._session.exec(statement).one()
         except Exception as e:
             logger.error(f"Error counting records: {str(e)}")
+            self._session.rollback()
             raise

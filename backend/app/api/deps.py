@@ -16,7 +16,10 @@ from sqlmodel import Session
 from app.core import security
 from app.core.postgres.config import settings
 from app.core.postgres.dao import UserDAO
-from app.core.postgres.session_handler import get_session_with_commit, get_session_without_commit
+from app.core.postgres.session_handler import (
+    get_session_with_commit,
+    get_session_without_commit
+)
 from app.models.core import User
 from app.schemas.core_schemas import TokenPayload
 
