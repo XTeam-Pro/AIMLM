@@ -182,10 +182,8 @@ def register_user(
             status_code=400,
             detail="The user with this email already exists in the system",
         )
-
-    user_create = UserCreate.model_validate(user_in)
-    return user_dao.add(user_create.model_dump())
-
+    user_create = UserCreate(**user_in.model_dump())
+    return user_dao.add(user_create)
 
 @router.get("/{user_id}", response_model=UserPublic)
 def read_user_by_id(
@@ -201,7 +199,7 @@ def read_user_by_id(
 
     if user == current_user:
         return user
-    if not current_user.is_superuser:
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=403,
             detail="The user doesn't have enough privileges",

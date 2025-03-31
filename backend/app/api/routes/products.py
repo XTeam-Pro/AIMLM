@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, CommittedSessionDep, UncommittedSessionDep
 from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO
-from app.schemas.core_schemas import ProductPublic, ProductCreate, ProductUpdate, Message, UserRole
+from app.schemas.core_schemas import ProductPublic, ProductCreate, ProductUpdate, Message
 
 router = APIRouter(prefix="/product", tags=["products"])
 
@@ -73,7 +73,7 @@ def update_product(
         product_in: ProductUpdate,
 ) -> Any:
     """Update product details (Admin only)"""
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
     product_dao = ProductDAO(session)

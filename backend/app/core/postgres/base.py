@@ -138,7 +138,7 @@ class BaseDAO(Generic[T]):
                 filter_dict = filters.model_dump(exclude_unset=True)
                 for field, value in filter_dict.items():
                     query = query.where(col(getattr(self.model, field)) == value)
-            return self._session.exec(query).scalar()
+            return self._session.exec(query).one()
         except Exception as e:
             logger.error(f"Error counting records: {str(e)}")
             raise

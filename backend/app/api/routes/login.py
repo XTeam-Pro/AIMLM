@@ -66,7 +66,7 @@ def recover_password(email: EmailStr, session: CommittedSessionDep) -> Message:
     """
     Password Recovery
     """
-    user = crud.get_user_by_email(session=session, email=email)
+    user = UserDAO(session).find_one_or_none({"email": email})
 
     if not user:
         raise HTTPException(
@@ -113,11 +113,11 @@ def reset_password(session: CommittedSessionDep, body: NewPassword) -> Message:
     dependencies=[Depends(get_current_active_superuser)],
     response_class=HTMLResponse,
 )
-def recover_password_html_content(email: EmailStr, session: CommittedSessionDep) -> Any:
+def recover_password_html_content(email: str, session: CommittedSessionDep) -> Any:
     """
     HTML Content for Password Recovery
     """
-    user = crud.get_user_by_email(session=session, email=email)
+    user = UserDAO(session).find_one_or_none({"email": email})
 
     if not user:
         raise HTTPException(

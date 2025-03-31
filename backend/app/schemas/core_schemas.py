@@ -110,13 +110,13 @@ class TimeZonePublic(TimeZoneBase):
 
 
 class UserBase(BaseModel):
-    email: EmailStr = Field(..., max_length=255)
+    email: str | EmailStr = Field(..., max_length=255)
     username: str = Field(..., max_length=100, min_length=6)
     phone: str = Field(..., max_length=20, pattern=r"^\+?[1-9]\d{1,14}$")
     full_name: str = Field(..., max_length=100)
 
 class UserRegister(UserBase):
-    password: str = Field(..., min_length=8, max_length=64)
+    hashed_password: str = Field(..., min_length=8, max_length=64)
     address: str = Field(...,
                          min_length=5,
                          max_length=200,
@@ -127,6 +127,9 @@ class UserRegister(UserBase):
                           max_length=12,
                           examples=["10001", "SW1A 1AA"],
                           description="Postal/ZIP code in local format")
+    role: UserRole = Field(default=UserRole.CLIENT)
+    status: UserStatus = Field(default=UserStatus.ACTIVE)
+    balance: Optional[float] = Field(default=0, ge=0)
 
     @field_validator('address')
     def validate_address(cls, v: str) -> str:
@@ -148,7 +151,7 @@ class UserRegister(UserBase):
             )
         return v
 
-    @field_validator('password')
+    @field_validator('hashed_password')
     def validate_password_complexity(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
@@ -174,11 +177,9 @@ class UserRegister(UserBase):
 
 
 class UserCreate(UserRegister):
-    id: uuid.UUID = Field(...)
-    balance: Optional[float] = Field(default=None, ge=0)
     status: UserStatus = Field(default=UserStatus.ACTIVE)
     role: UserRole = Field(default=UserRole.CLIENT)
-    timezone_id: Optional[int] = Field(default=None)
+    timezone_id: Optional[int] = Field(default=0)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
 
 
