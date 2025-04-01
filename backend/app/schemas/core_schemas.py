@@ -119,13 +119,14 @@ class UserBase(BaseModel):
 
     @field_validator('email')
     def validate_email_rfc(cls, v):
-
         try:
             result = validate_email(v, check_deliverability=False)
-            blocked_domains = {'tempmail.com', 'example.com'} # This array can be expanded over time
-            domain = v.split('@')[-1]
-            if domain in blocked_domains:
-                raise ValueError('Disposable emails are not allowed')
+            # Whitelist admin@example.com
+            if v.lower() != "admin@example.com":
+                blocked_domains = {'tempmail.com', 'example.com'}
+                domain = v.split('@')[-1]
+                if domain in blocked_domains:
+                    raise ValueError('Disposable emails are not allowed')
             return result.normalized
         except EmailNotValidError as e:
             raise ValueError(str(e))
@@ -189,7 +190,7 @@ class UserRegister(UserBase):
 class UserCreate(UserRegister):
     status: UserStatus = Field(default=UserStatus.ACTIVE)
     role: UserRole = Field(default=UserRole.CLIENT)
-    timezone_id: Optional[int] = Field(default=0)
+    timezone_id: Optional[int] = Field(default=1)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
 
 

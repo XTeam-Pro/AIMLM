@@ -32,7 +32,6 @@ services:
       - "27017:27017"
     env_file:
       - .env
-      -
   redis:
     image: redis:latest
     restart: always
@@ -207,6 +206,7 @@ services:
 volumes:
   app-db-data:
   mongo-data:
+  redis-data:
 
 networks:
   traefik-public:

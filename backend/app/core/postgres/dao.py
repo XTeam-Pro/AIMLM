@@ -3,7 +3,7 @@ from uuid import UUID
 
 from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
-from app.models.core import User, Product, UserProductInteraction, CartItem, Transaction
+from app.models.core import User, Product, UserProductInteraction, CartItem, Transaction,TimeZone
 
 
 class UserDAO(BaseDAO[User]):
@@ -38,3 +38,14 @@ class CartItemDAO(BaseDAO[CartItem]):
 
 class TransactionDAO(BaseDAO[Transaction]):
     model = Transaction
+
+class TimeZoneDAO(BaseDAO[TimeZone]):
+    model = TimeZone
+
+    def find_by_name(self, name: str) -> Optional[TimeZone]:
+        """Find a timezone by name"""
+        return self.find_one_or_none({"name": name})
+
+    def find_by_offset(self, offset: str) -> Optional[TimeZone]:
+        """Find a timezone by offset"""
+        return self.find_one_or_none({"offset": offset})

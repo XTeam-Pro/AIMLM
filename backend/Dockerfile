@@ -4,6 +4,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/
 
+
+# Install redis-cli (redis-tools) and any other necessary packages
+RUN apt-get update && apt-get install -y redis-tools
+
+
 # Install uv
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
 COPY --from=ghcr.io/astral-sh/uv:0.4.15 /uv /bin/uv
