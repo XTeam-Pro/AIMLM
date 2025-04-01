@@ -5,9 +5,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter
 from redis import RedisError, Redis
-from sqlmodel import select
 
-from app.api.deps import CurrentUser
 
 
 router = APIRouter(tags=["Buyer"], prefix="/buyers")

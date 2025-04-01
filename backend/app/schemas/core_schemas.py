@@ -1,6 +1,7 @@
 import re
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
@@ -19,31 +20,38 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: Optional[uuid.UUID] = Field(default=None)
 
+
 class TokenPayload(BaseModel):
     sub: str | None = None
 
+
 class PasswordChange(BaseModel):
-    current_password: str = Field(...,)
+    current_password: str = Field(...)
     new_password: str = Field(..., min_length=8, max_length=40)
 
 
 class PasswordResetRequest(BaseModel):
-    email: EmailStr = Field(...,)
+    email: EmailStr = Field(...)
+
 
 class NewPassword(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=40)
 
+
 class PasswordReset(BaseModel):
-    token: str = Field(...,)
+    token: str = Field(...)
     new_password: str = Field(..., min_length=8)
+
 
 class UpdatePassword(BaseModel):
     current_password: str = Field(min_length=8, max_length=40)
     new_password: str = Field(min_length=8, max_length=40)
 
+
 class Message(BaseModel):
     message: str = Field(..., max_length=100)
+
 
 class UserRole(str, Enum):
     CLIENT = "client"
@@ -79,11 +87,14 @@ class InteractionType(str, Enum):
 
 
 class TransactionType(str, Enum):
-    PURCHASE = "purchase"    # Покупка товара (amount < 0, points > 0)
-    BONUS = "bonus"          # Бонус за активность (amount = 0, points > 0)
-    PENALTY = "penalty"      # Штраф (amount = 0, points < 0)
-    ACHIEVEMENT = "achievement" # Награда за достижение
-    REFERRAL = "referral"    # Реферальный бонус (amount > 0)
+    PURCHASE = "purchase"   # Покупка товара (cash_amount < 0, pv_amount > 0)
+    BONUS = "bonus"         # Бонус за активность (cash_amount = 0, pv_amount > 0)
+    PENALTY = "penalty"     # Штраф (cash_amount = 0, pv_amount < 0)
+    ACHIEVEMENT = "achievement"  # Награда за достижение
+    REFERRAL = "referral"   # Реферальный бонус (cash_amount > 0)
+    CASH_OUT = "cash_out"   # Вывод средств (cash_amount < 0)
+    CASH_IN = "cash_in"     # Пополнение баланса (cash_amount > 0)
+
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"
@@ -107,13 +118,19 @@ class TimeZoneUpdate(BaseModel):
 
 class TimeZonePublic(TimeZoneBase):
     id: int = Field(...)
-
     model_config = ConfigDict(from_attributes=True)
 
 
 class UserBase(BaseModel):
     email: str | EmailStr = Field(..., max_length=255)
-    username: str = Field(..., max_length=100, min_length=6)
+    username: str = Field(
+        ...,
+        min_length=6,
+        max_length=30,
+        pattern=r"^[a-zA-Z0-9_]+$",
+        examples=["john_doe123"],
+        description="Username may only contain letters, numbers and underscores"
+    )
     phone: str = Field(..., max_length=20, pattern=r"^\+?[1-9]\d{1,14}$")
     full_name: str = Field(..., max_length=100)
 
@@ -127,25 +144,35 @@ class UserBase(BaseModel):
                 domain = v.split('@')[-1]
                 if domain in blocked_domains:
                     raise ValueError('Disposable emails are not allowed')
+            blocked_domains = {'tempmail.com', 'example.com'}
+            domain = v.split('@')[-1]
+            if domain in blocked_domains:
+                raise ValueError('Disposable emails are not allowed')
             return result.normalized
         except EmailNotValidError as e:
             raise ValueError(str(e))
 
+
 class UserRegister(UserBase):
     hashed_password: str = Field(..., min_length=8, max_length=64, examples=["String123"])
-    address: str = Field(...,
-                         min_length=5,
-                         max_length=200,
-                         examples=["123 Main St, Apt 4B, New York"],
-                         description="Full street address including apartment number")
-    postcode: str = Field(...,
-                          min_length=3,
-                          max_length=12,
-                          examples=["10001", "SW1A 1AA"],
-                          description="Postal/ZIP code in local format")
+    address: str = Field(
+        ...,
+        min_length=5,
+        max_length=200,
+        examples=["123 Main St, Apt 4B, New York"],
+        description="Full street address including apartment number"
+    )
+    postcode: str = Field(
+        ...,
+        min_length=3,
+        max_length=12,
+        examples=["10001", "SW1A 1AA"],
+        description="Postal/ZIP code in local format"
+    )
     role: UserRole = Field(default=UserRole.CLIENT)
     status: UserStatus = Field(default=UserStatus.ACTIVE)
-    balance: Optional[float] = Field(default=0, ge=0)
+    cash_balance: float = Field(default=0.0, ge=0, description="Real money balance")
+    pv_balance: float = Field(default=0.0, ge=0, description="Personal Volume points balance")
 
     @field_validator('address')
     def validate_address(cls, v: str) -> str:
@@ -186,7 +213,6 @@ class UserRegister(UserBase):
         return v
 
 
-
 class UserCreate(UserRegister):
     status: UserStatus = Field(default=UserStatus.ACTIVE)
     role: UserRole = Field(default=UserRole.CLIENT)
@@ -195,49 +221,59 @@ class UserCreate(UserRegister):
 
 
 class UserUpdate(BaseModel):
-    email: EmailStr = Field(default=None)
+    email: Optional[EmailStr] = Field(default=None)
     phone: Optional[str] = Field(default=None, max_length=20, pattern=r"^\+?[1-9]\d{1,14}$")
     full_name: Optional[str] = Field(default=None, max_length=100)
-    role: UserRole = Field(default=None)
+    role: Optional[UserRole] = Field(default=None)
     status: Optional[UserStatus] = Field(default=None)
     timezone_id: Optional[int] = Field(default=None)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
-    balance: Optional[float] = Field(default=None, ge=0)
+    cash_balance: Optional[float] = Field(default=None, ge=0)
+    pv_balance: Optional[float] = Field(default=None, ge=0)
+
 
 class UserUpdateMe(BaseModel):
-    full_name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
+    full_name: Optional[str] = Field(default=None, max_length=255)
+    email: Optional[EmailStr] = Field(default=None, max_length=255)
 
 
 class UserPublic(UserBase):
     id: uuid.UUID = Field(...)
     role: UserRole = Field(...)
     status: UserStatus = Field(...)
-    balance: float = Field(...)
+    cash_balance: Decimal = Field(..., ge=0, description="Real money balance")
+    pv_balance: Decimal = Field(..., ge=0, description="Personal Volume points balance")
     registration_date: datetime = Field(...)
     timezone: Optional[TimeZonePublic] = Field(default=None)
+    achievements: List[AchievementPublic] = Field(default_factory=list)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    model_config = ConfigDict(from_attributes=True)
 
 class UsersPublic(BaseModel):
     data: list[User]
     count: int
 
+
 class ProductBase(BaseModel):
-    id: uuid.UUID = Field(...)
     title: str = Field(..., max_length=100)
     description: str = Field(..., max_length=2000)
     category: ProductCategory = Field(...)
-    price: float = Field(..., ge=0)
-    points_value: float = Field(..., ge=0)
+    price: float = Field(..., ge=0, description="Price in real money")
+    pv_value: float = Field(default=0.0, ge=0, description="Personal Volume value")
 
 
 class ProductCreate(ProductBase):
     image_url: Optional[str] = Field(default=None, max_length=500)
     is_active: bool = Field(default=True)
-    webinar_link: str = Field(default=None, max_length=500)
+    webinar_link: Optional[str] = Field(default=None, max_length=500)
     is_collection: bool = Field(default=False)
     collection_items: Optional[List[Dict[str, Any]]] = Field(default=None)
+
+    @field_validator('webinar_link')
+    def validate_webinar_link(cls, v, values):
+        if values.get('category') == ProductCategory.WEBINAR and not v:
+            raise ValueError('Webinar link is required for webinar products')
+        return v
 
     @field_validator('price')
     def validate_price(cls, v):
@@ -256,8 +292,8 @@ class ProductUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=100)
     description: Optional[str] = Field(default=None, max_length=2000)
     category: Optional[ProductCategory] = Field(default=None)
-    price: Optional[float] = Field(default=None, ge=0)
-    points_value: Optional[float] = Field(default=None, ge=0)
+    price: Optional[Decimal] = Field(default=None, ge=0)
+    pv_value: Optional[float] = Field(default=None, ge=0)
     image_url: Optional[str] = Field(default=None, max_length=500)
     is_active: Optional[bool] = Field(default=None)
     webinar_link: Optional[str] = Field(default=None, max_length=500)
@@ -266,20 +302,20 @@ class ProductUpdate(BaseModel):
 
 
 class ProductPublic(ProductBase):
+    id: uuid.UUID = Field(...)
     image_url: Optional[str] = Field(default=None)
     is_active: bool = Field(...)
     created_at: datetime = Field(...)
-
     model_config = ConfigDict(from_attributes=True)
 
 
 class UserProductInteractionBase(BaseModel):
     interaction_type: InteractionType = Field(...)
-    points_awarded: float = Field(default=0.0, ge=0)
     additional_info: Optional[Dict[str, Any]] = Field(default=None)
 
 
 class UserProductInteractionCreate(UserProductInteractionBase):
+    pv_awarded: float = Field(default=0.0, ge=0, description="PV points awarded for this interaction")
     product_id: Optional[uuid.UUID] = Field(default=None)
     user_id: uuid.UUID = Field(...)
     achievement_id: Optional[uuid.UUID] = Field(default=None)
@@ -287,13 +323,13 @@ class UserProductInteractionCreate(UserProductInteractionBase):
 
 class UserProductInteractionUpdate(BaseModel):
     interaction_type: Optional[InteractionType] = Field(default=None)
-    points_awarded: Optional[float] = Field(default=None, ge=0)
+    pv_awarded: Optional[float] = Field(default=None, ge=0)
     additional_info: Optional[Dict[str, Any]] = Field(default=None)
 
-    @field_validator('points_awarded')
+    @field_validator('pv_awarded')
     def validate_points(cls, v):
         if v is not None and v < 0:
-            raise ValueError('Points awarded cannot be negative')
+            raise ValueError('PV awarded cannot be negative')
         return v
 
 
@@ -302,58 +338,60 @@ class UserProductInteractionPublic(UserProductInteractionBase):
     interaction_date: datetime = Field(...)
     user_id: uuid.UUID = Field(...)
     product_id: Optional[uuid.UUID] = Field(default=None)
-
     model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionBase(BaseModel):
-    amount: float = Field(...)
-    points: float = Field(..., ge=0)
+    cash_amount: Decimal = Field(..., ge=0, max_digits=12, decimal_places=2)
+    pv_amount: Decimal = Field(..., ge=0, max_digits=12, decimal_places=2)
     type: TransactionType = Field(...)
     additional_info: Optional[Dict[str, Any]] = Field(default=None, description="Additional transaction metadata")
 
 
 class TransactionCreate(TransactionBase):
-    product_id: Optional[uuid.UUID] = Field(...)
-    status: TransactionStatus = Field(..., )
-
+    product_id: Optional[uuid.UUID] = Field(default=None)
+    status: TransactionStatus = Field(...)
     achievement_id: Optional[uuid.UUID] = Field(default=None)
     user_id: uuid.UUID = Field(...)
 
-    @field_validator('amount')
-    def validate_amount(cls, v, values):
-        if v <= 0 and values.get('type') != TransactionType.BONUS:
-            raise ValueError('Amount must be positive for non-bonus transactions')
+    @field_validator('cash_amount')
+    def validate_cash_amount(cls, v, values):
+        transaction_type = values.get('type')
+        if transaction_type == TransactionType.PURCHASE and v >= 0:
+            raise ValueError('Purchase transactions must have negative cash amount')
+        if transaction_type == TransactionType.REFERRAL and v <= 0:
+            raise ValueError('Referral transactions must have positive cash amount')
+        if transaction_type == TransactionType.CASH_OUT and v >= 0:
+            raise ValueError('Cash out transactions must have negative cash amount')
+        if transaction_type == TransactionType.CASH_IN and v <= 0:
+            raise ValueError('Cash in transactions must have positive cash amount')
         return v
 
-    @field_validator('points')
-    def validate_points(cls, v, values):
-        if v < 0 and values.get('type') != TransactionType.PENALTY:
-            raise ValueError('Points can be negative only for penalty transactions')
+    @field_validator('pv_amount')
+    def validate_pv_amount(cls, v, values):
+        transaction_type = values.get('type')
+        if transaction_type == TransactionType.PENALTY and v >= 0:
+            raise ValueError('Penalty transactions must have negative PV amount')
+        if transaction_type in [TransactionType.PURCHASE, TransactionType.BONUS,
+                              TransactionType.ACHIEVEMENT, TransactionType.REFERRAL] and v <= 0:
+            raise ValueError('This transaction type must have positive PV amount')
         return v
 
 
 class TransactionUpdate(BaseModel):
-    amount: Optional[float] = Field(...,)
-    points: Optional[float] = Field(default=None, ge=0)
-    type: TransactionType = Field(...,)
-    status: TransactionStatus = Field(...,)
-    additional_info: Optional[Dict[str, Any]] = Field(default=None, description="Updated transaction metadata")
-
-    @field_validator('amount')
-    def validate_updated_amount(cls, v, values):
-        if v is not None and v <= 0 and values.get('type') != TransactionType.BONUS:
-            raise ValueError('Amount must be positive for non-bonus transactions')
-        return v
+    cash_amount: Decimal = Field(default=None)
+    pv_amount: Optional[float] = Field(default=None, ge=0)
+    type: Optional[TransactionType] = Field(default=None)
+    status: Optional[TransactionStatus] = Field(default=None)
+    additional_info: Optional[Dict[str, Any]] = Field(default=None)
 
 
 class TransactionPublic(TransactionBase):
     id: uuid.UUID = Field(...)
     created_at: datetime = Field(...)
     user_id: uuid.UUID = Field(...)
-    product_id: uuid.UUID = Field(...)
+    product_id: Optional[uuid.UUID] = Field(default=None)
     achievement: Optional[AchievementPublic] = Field(default=None)
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -375,5 +413,34 @@ class CartItemPublic(CartItemBase):
     product: ProductPublic = Field(...)
     added_at: datetime = Field(...)
     user_id: uuid.UUID = Field(...)
-
     model_config = ConfigDict(from_attributes=True)
+
+
+class FavoriteProduct(BaseModel):
+    product_id: uuid.UUID = Field(...)
+    added_at: datetime = Field(default_factory=datetime.now)
+
+
+class FavoriteList(BaseModel):
+    products: List[FavoriteProduct] = Field(default_factory=list)
+    count: int = Field(0)
+
+
+class BalanceHistory(BaseModel):
+    date: datetime
+    cash_balance: Decimal
+    pv_balance: float
+    transaction_id: uuid.UUID
+
+
+class PurchaseResponse(BaseModel):
+    message: str
+    pv_earned: float
+    new_pv_balance: float
+    new_cash_balance: Decimal
+    transaction_id: uuid.UUID
+
+class UserBalanceResponse(BaseModel):
+    cash_balance: Decimal = Field(..., description="Current cash balance")
+    pv_balance: float = Field(..., description="Current PV balance")
+    history: List[BalanceHistory] = Field(default_factory=list)

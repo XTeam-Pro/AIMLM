@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from redis import Redis
 from sqlmodel import Session
 
+from app.api.services.purchase_service import PurchaseService
 from app.core import security
 from app.core.postgres.config import settings
 from app.core.postgres.dao import UserDAO
@@ -48,6 +49,7 @@ UncommittedSessionDep = Annotated[Session, Depends(get_session_without_commit)]
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 
+
 def get_current_user(session: UncommittedSessionDep, token: TokenDep) -> User:
     try:
         payload = jwt.decode(
@@ -66,7 +68,6 @@ def get_current_user(session: UncommittedSessionDep, token: TokenDep) -> User:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
 
-
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
@@ -76,3 +77,11 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
             status_code=403, detail="The user doesn't have enough privileges"
         )
     return current_user
+
+
+def get_purchase_service(session: CommittedSessionDep) -> PurchaseService:
+    """Returns PurchaseService instance with current session"""
+    return PurchaseService(session)
+
+
+PurchaseServiceDep = Annotated[PurchaseService, Depends(get_purchase_service)]
