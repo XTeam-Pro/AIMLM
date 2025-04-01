@@ -4,7 +4,6 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import EmailStr
 
 from app import crud
 from app.api.deps import CurrentUser, get_current_active_superuser, UncommittedSessionDep, CommittedSessionDep
@@ -62,7 +61,7 @@ def test_token(current_user: CurrentUser) -> Any:
 
 
 @router.post("/password-recovery/{email}")
-def recover_password(email: EmailStr, session: CommittedSessionDep) -> Message:
+def recover_password(email: str, session: CommittedSessionDep) -> Message:
     """
     Password Recovery
     """

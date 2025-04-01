@@ -1,7 +1,6 @@
 from typing import  Any
 from uuid import UUID
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 
 from app.api.deps import CurrentUser, CommittedSessionDep, UncommittedSessionDep

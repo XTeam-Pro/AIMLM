@@ -4,6 +4,7 @@ from uuid import UUID
 from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
 from app.models.core import User, Product, UserProductInteraction, CartItem, Transaction
+from app.schemas.core_schemas import TransactionType, TransactionCreate, TransactionStatus
 
 
 class UserDAO(BaseDAO[User]):
@@ -18,14 +19,21 @@ class UserDAO(BaseDAO[User]):
             return None
         return user
 
-    def update_balance(self, user_id: UUID, amount: float) -> User:
-        """Atomic user balance update"""
+    def update_cash_balance(self, user_id: UUID, amount: float) -> User:
+        """Atomic user cash balance update"""
         user = self.find_one_or_none_by_id(user_id)
         if not user:
             raise ValueError("User not found")
 
-        user.balance += amount
+        user.cash_balance += amount
         return self.update({"id": user_id}, {"balance": user.balance})
+
+    def update_pv_balance(self, user_id: UUID, amount: float):
+        """Atomic user pv balance update"""
+        user = self.find_one_or_none_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        user.pv_balance += amount
 
 class ProductDAO(BaseDAO[Product]):
     model = Product
@@ -38,3 +46,22 @@ class CartItemDAO(BaseDAO[CartItem]):
 
 class TransactionDAO(BaseDAO[Transaction]):
     model = Transaction
+    def create_transaction(self,
+            user_id: UUID,
+            amount: float,
+            pv_amount: float,
+            transaction_type: TransactionType,
+            product_id: UUID = None,
+            additional_info: dict = None
+    ) -> Transaction:
+        """Creates transaction record"""
+        transaction = TransactionCreate(
+            user_id=user_id,
+            cash_amount=amount,
+            pv_amount=pv_amount,
+            type=transaction_type,
+            product_id=product_id,
+            status=TransactionStatus.COMPLETED,
+            additional_info=additional_info
+        )
+        return self.add(transaction)
