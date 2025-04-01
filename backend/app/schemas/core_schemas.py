@@ -144,10 +144,6 @@ class UserBase(BaseModel):
                 domain = v.split('@')[-1]
                 if domain in blocked_domains:
                     raise ValueError('Disposable emails are not allowed')
-            blocked_domains = {'tempmail.com', 'example.com'}
-            domain = v.split('@')[-1]
-            if domain in blocked_domains:
-                raise ValueError('Disposable emails are not allowed')
             return result.normalized
         except EmailNotValidError as e:
             raise ValueError(str(e))
