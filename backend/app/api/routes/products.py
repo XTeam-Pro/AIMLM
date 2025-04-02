@@ -54,8 +54,8 @@ def create_product(
     """Create new product (admin only)."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    if ProductDAO(session).find_one_or_none_by_id(product_in.id):
-        raise HTTPException(status_code=409, detail=f"Shaver {product_in.title} already exists ")
+    if ProductDAO(session).find_one_or_none({"title": product_in.title}):
+        raise HTTPException(status_code=409, detail=f"{product_in.title} already exists ")
 
     return ProductDAO(session).add(product_in)
 

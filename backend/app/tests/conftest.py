@@ -8,7 +8,8 @@ from sqlmodel import Session
 
 from app.core.postgres.config import settings
 from app.core.postgres.dao import UserDAO
-from app.core.postgres.db import init_db, engine
+from app.core.postgres.db import init_db
+from app.core.postgres.db_engine import engine
 from app.main import app
 from app.models.core import User
 from app.schemas.core_schemas import UserRegister

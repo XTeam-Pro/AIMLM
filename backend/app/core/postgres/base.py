@@ -30,7 +30,7 @@ class BaseDAO(Generic[T]):
         """Find a record by its ID using SQLModel methods."""
         try:
             statement = select(self.model).where(self.model.id == data_id)
-            result = self._session.exec(statement).first()
+            result = self._session.execute(statement).first()
             return result
         except Exception as e:
             logger.error(f"Error finding record by ID {data_id}: {str(e)}")
@@ -38,19 +38,14 @@ class BaseDAO(Generic[T]):
             raise
 
     def find_one_or_none(self, filters: Dict[str, Any]) -> Optional[T]:
-        """Find a single record matching the filters."""
         try:
             self._validate_fields(filters)
             statement = select(self.model)
-
-            conditions = []
-            for field, value in filters.items():
-                conditions.append(getattr(self.model, field) == value)
-
+            conditions = [getattr(self.model, field) == value for field, value in filters.items()]
             if conditions:
                 statement = statement.where(and_(*conditions))
-
-            return self._session.exec(statement).first()
+            # Use scalars() to get model instances instead of Row objects
+            return self._session.scalars(statement).first()
         except Exception as e:
             logger.error(f"Error finding record with filters {filters}: {str(e)}")
             self._session.rollback()
@@ -112,7 +107,7 @@ class BaseDAO(Generic[T]):
                     statement = statement.where(and_(*conditions))
 
             statement = statement.offset(skip).limit(limit)
-            result = self._session.exec(statement)
+            result = self._session.execute(statement)
             return list(result.all())
         except Exception as e:
             logger.error(f"Error fetching records: {str(e)}")
@@ -164,7 +159,7 @@ class BaseDAO(Generic[T]):
                 conditions.append(getattr(self.model, field) == value)
 
             statement = delete(self.model).where(and_(*conditions))
-            result = self._session.exec(statement)
+            result = self._session.execute(statement)
             self._session.flush()
             return result.rowcount
         except Exception as e:
@@ -186,7 +181,7 @@ class BaseDAO(Generic[T]):
                 if conditions:
                     statement = statement.where(and_(*conditions))
 
-            return self._session.exec(statement).one()
+            return self._session.execute(statement).one()
         except Exception as e:
             logger.error(f"Error counting records: {str(e)}")
             self._session.rollback()
