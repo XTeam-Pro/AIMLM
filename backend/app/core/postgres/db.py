@@ -34,7 +34,7 @@ def init_db(session: CommittedSessionDep) -> None:
                 "phone": "+1234567890",
                 "full_name": "Super User",
                 "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
-                "address": "123 Admin St, Admin City",
+                "address": "123,Admin St,AdminCity",
                 "postcode": "ADMIN01",
                 "role": UserRole.ADMIN.value,
                 "status": UserStatus.ACTIVE.value,

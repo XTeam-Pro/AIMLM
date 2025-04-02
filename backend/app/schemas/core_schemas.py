@@ -6,12 +6,12 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 
 from email_validator import validate_email, EmailNotValidError
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field, model_validator
 
 from app.models.core import User
 from app.schemas.gamification_schemas import AchievementPublic
 
-
+from app.core.security import get_password_hash
 class Token(BaseModel):
     access_token: str
     token_type: str = Field(default="bearer")
@@ -210,10 +210,18 @@ class UserRegister(UserBase):
 
 
 class UserCreate(UserRegister):
+    password: str = Field(..., min_length=8, max_length=64)
     status: UserStatus = Field(default=UserStatus.ACTIVE)
     role: UserRole = Field(default=UserRole.CLIENT)
     timezone_id: Optional[int] = Field(default=1)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
+
+    @model_validator(mode="before")
+    def hash_password(cls, values):
+        password = values.get("password")
+        if password:
+            values["hashed_password"] = get_password_hash(password)
+        return values
 
 
 class UserUpdate(BaseModel):
