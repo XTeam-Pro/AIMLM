@@ -20,6 +20,15 @@ from app.utils import (
     verify_password_reset_token,
 )
 
+
+
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+
 router = APIRouter(tags=["login"])
 
 
@@ -32,17 +41,23 @@ def login_access_token(
     OAuth2 compatible token login, get an access token for future requests
     """
     # Authenticate user through DAO
+    logger.info(f"Step 1: login_access_token  email {form_data.username } pass {form_data.password }")
     user_dao = UserDAO(session)
     user = user_dao.authenticate(
         email=form_data.username,
         password=form_data.password
     )
 
+    logger.info("Step 2: login_access_token function called")
     if not user:
+        logger.warning(f"Failed login attempt: {form_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+
     if user.status == UserStatus.INACTIVE:
+        logger.info(f"Inactive user attempted login: {form_data.username}")
         raise HTTPException(status_code=400, detail="Inactive user")
 
+    logger.info("okayyyyyyyyyyyyyyyyyyyyyy")
     # Generate token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return Token(

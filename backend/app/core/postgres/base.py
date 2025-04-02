@@ -29,9 +29,7 @@ class BaseDAO(Generic[T]):
     def find_one_or_none_by_id(self, data_id: uuid.UUID | str) -> Optional[T]:
         """Find a record by its ID using SQLModel methods."""
         try:
-            statement = select(self.model).where(self.model.id == data_id)
-            result = self._session.execute(statement).first()
-            return result
+            return self._session.get(self.model, data_id)
         except Exception as e:
             logger.error(f"Error finding record by ID {data_id}: {str(e)}")
             self._session.rollback()
@@ -51,11 +49,11 @@ class BaseDAO(Generic[T]):
             self._session.rollback()
             raise
 
-    def add(self, values: BaseModel) -> T:
+    def add(self, values: dict) -> T:
         """Add a new record."""
         try:
-            values_dict = values.model_dump(exclude_unset=True)
-            new_instance = self.model(**values_dict)
+            # Use the dictionary directly instead of calling model_dump
+            new_instance = self.model(**values)
             self._session.add(new_instance)
             self._session.flush()
             self._session.refresh(new_instance)
@@ -107,8 +105,8 @@ class BaseDAO(Generic[T]):
                     statement = statement.where(and_(*conditions))
 
             statement = statement.offset(skip).limit(limit)
-            result = self._session.execute(statement)
-            return list(result.all())
+            result = self._session.execute(statement).scalars().all()
+            return list(result)
         except Exception as e:
             logger.error(f"Error fetching records: {str(e)}")
             self._session.rollback()
@@ -171,17 +169,12 @@ class BaseDAO(Generic[T]):
         """Count records matching optional filters."""
         try:
             statement = select(func.count()).select_from(self.model)
-
             if filters:
                 self._validate_fields(filters)
-                conditions = []
-                for field, value in filters.items():
-                    conditions.append(getattr(self.model, field) == value)
-
+                conditions = [getattr(self.model, field) == value for field, value in filters.items() if value is not None]
                 if conditions:
                     statement = statement.where(and_(*conditions))
-
-            return self._session.execute(statement).one()
+            return self._session.execute(statement).scalar()  # Use scalar() to get an integer
         except Exception as e:
             logger.error(f"Error counting records: {str(e)}")
             self._session.rollback()

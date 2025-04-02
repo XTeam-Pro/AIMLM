@@ -8,7 +8,7 @@ from app.schemas.core_schemas import UserCreate,TimeZoneCreate
 
 from app.core.postgres.config import settings
 from app.schemas.core_schemas import UserRole, UserStatus
-
+from app.core.security import get_password_hash
 def init_db(session: CommittedSessionDep) -> None:
         
         timezone_dao = TimeZoneDAO(session)
@@ -33,7 +33,7 @@ def init_db(session: CommittedSessionDep) -> None:
                 "username": "administrator",
                 "phone": "+1234567890",
                 "full_name": "Super User",
-                "hashed_password": settings.FIRST_SUPERUSER_PASSWORD,
+                "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
                 "address": "123 Admin St, Admin City",
                 "postcode": "ADMIN01",
                 "role": UserRole.ADMIN.value,

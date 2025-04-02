@@ -77,7 +77,7 @@ def create_user(
         email_data = generate_new_account_email(
             email_to=user_in.email,
             username=user_in.username,
-            password=user_in.password
+            password=user_in.hashed_password
         )
         send_email(
             email_to=user_in.email,

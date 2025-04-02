@@ -2,10 +2,15 @@ from typing import Optional
 from uuid import UUID
 
 from app.core.postgres.base import BaseDAO
-from app.core.security import verify_password
+from app.core.security import verify_password,get_password_hash
 from app.models.core import User, Product, UserProductInteraction, CartItem, Transaction,TimeZone
 
 from app.schemas.core_schemas import TransactionType, TransactionCreate, TransactionStatus
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class UserDAO(BaseDAO[User]):
@@ -13,11 +18,20 @@ class UserDAO(BaseDAO[User]):
 
     def authenticate(self, email: str, password: str) -> Optional[User]:
         """Authenticate a user with email and password"""
+        logger.info(f"dao 1  {email} pass {password }")
+
         user = self.find_one_or_none({"email": email})
+        logger.info(f"dao 2  step 2")
+
         if not user:
+            logger.info(f"dao not user")
             return None
+        logger.info(f"dao found user")
+        logger.info(f"dao user hashed {user.hashed_password}")
         if not verify_password(password, user.hashed_password):
+            logger.info(f"dao bad password")
             return None
+        logger.info(f"dao okay password")
         return user
 
     def update_cash_balance(self, user_id: UUID, amount: float) -> User:

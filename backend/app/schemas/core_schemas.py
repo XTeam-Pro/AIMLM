@@ -246,7 +246,7 @@ class UserPublic(UserBase):
 
 
 class UsersPublic(BaseModel):
-    data: list[User]
+    data: list[UserPublic]
     count: int
 
 
