@@ -6,9 +6,11 @@ from typing import Optional, List, Dict, Any
 
 from sqlalchemy import JSON
 from sqlmodel import SQLModel, Field, Relationship
-from enum import Enum
+
 
 from app.models.gamification import UserAchievement, Achievement
+from app.schemas.core_schemas import UserStatus, UserRole, TransactionStatus
+from app.schemas.types import TransactionType
 
 
 class TimeZone(SQLModel, table=True):
@@ -18,19 +20,6 @@ class TimeZone(SQLModel, table=True):
     offset: str = Field(max_length=6, regex=r"^[+-]\d{2}:\d{2}$")  # e.g. "+03:00"
 
 
-class UserRole(str, Enum):
-    CLIENT = "client"
-    MANAGER = "manager"
-    MENTOR = "mentor"
-    DISTRIBUTOR = "distributor"
-    ADMIN = "admin"
-
-
-class UserStatus(str, Enum):
-    INACTIVE = "inactive"
-    ACTIVE = "active"
-    PENDING = "pending"
-    BLOCKED = "blocked"
 
 
 class UserBase(SQLModel):
@@ -67,13 +56,6 @@ class User(UserBase, table=True):
     achievements: List["UserAchievement"] = Relationship(back_populates="user")
 
 
-class ProductCategory(str, Enum):
-    COSMETICS = "cosmetics"
-    NUTRITION = "nutrition"
-    COURSE = "course"
-    WEBINAR = "webinar"
-    COLLECTION = "collection"
-
 
 class Product(SQLModel, table=True):
     __tablename__ = "products"
@@ -107,15 +89,6 @@ class CartItem(SQLModel, table=True):
     product: "Product" = Relationship()
 
 
-class InteractionType(str, Enum):
-    VIEW = "view"
-    PURCHASE = "purchase"
-    CART_ADD = "cart_add"
-    FAVORITE = "favorite"
-    WEBINAR_REGISTER = "webinar_register"
-    WEBINAR_ATTEND = "webinar_attend"
-    ACHIEVEMENT_UNLOCK = "achievement_unlock"
-
 
 class UserProductInteraction(SQLModel, table=True):
     __tablename__ = "user_product_interactions"
@@ -134,21 +107,6 @@ class UserProductInteraction(SQLModel, table=True):
     achievement: Optional["Achievement"] = Relationship()
 
 
-class TransactionType(str, Enum):
-    PURCHASE = "purchase"
-    BONUS = "bonus"
-    PENALTY = "penalty"
-    ACHIEVEMENT = "achievement"
-    REFERRAL = "referral"
-    CASH_OUT = "cash_out"
-    CASH_IN = "cash_in"
-
-
-class TransactionStatus(str, Enum):
-    PENDING = "pending"
-    FAILED = "failed"
-    COMPLETED = "completed"
-
 
 class Transaction(SQLModel, table=True):
     __tablename__ = "transactions"
@@ -156,7 +114,8 @@ class Transaction(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="users.id")
     cash_amount: Decimal = Field(max_digits=12, decimal_places=2)
     pv_amount: Decimal = Field(max_digits=12, decimal_places=2)
-    type: str = Field(default=TransactionStatus.PENDING)
+    type: str = Field(...,)
+    status: str = Field(default=TransactionStatus.PENDING)
     product_id: Optional[uuid.UUID] = Field(default=None, foreign_key="products.id")
     achievement_id: Optional[uuid.UUID] = Field(default=None, foreign_key="achievements.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

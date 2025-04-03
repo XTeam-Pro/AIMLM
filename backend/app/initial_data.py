@@ -4,6 +4,7 @@ from sqlmodel import Session
 
 from app.core.postgres.db import  init_db
 from app.core.postgres.db_engine import engine
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

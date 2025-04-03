@@ -2,16 +2,15 @@ import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
 from typing import Optional, List, Dict, Any
 
 from email_validator import validate_email, EmailNotValidError
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field, model_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 
-from app.models.core import User
 from app.schemas.gamification_schemas import AchievementPublic
+from app.schemas.types import UserRole, UserStatus, ProductCategory, InteractionType, TransactionType, TransactionStatus
 
-from app.core.security import get_password_hash
+
 class Token(BaseModel):
     access_token: str
     token_type: str = Field(default="bearer")
@@ -52,54 +51,6 @@ class UpdatePassword(BaseModel):
 class Message(BaseModel):
     message: str = Field(..., max_length=100)
 
-
-class UserRole(str, Enum):
-    CLIENT = "client"
-    MANAGER = "manager"
-    MENTOR = "mentor"
-    DISTRIBUTOR = "distributor"
-    ADMIN = "admin"
-
-
-class UserStatus(str, Enum):
-    INACTIVE = "inactive"
-    ACTIVE = "active"
-    PENDING = "pending"
-    BLOCKED = "blocked"
-
-
-class ProductCategory(str, Enum):
-    COSMETICS = "cosmetics"
-    NUTRITION = "nutrition"
-    COURSE = "course"
-    WEBINAR = "webinar"
-    COLLECTION = "collection"
-
-
-class InteractionType(str, Enum):
-    VIEW = "view"
-    PURCHASE = "purchase"
-    CART_ADD = "cart_add"
-    FAVORITE = "favorite"
-    WEBINAR_REGISTER = "webinar_register"
-    WEBINAR_ATTEND = "webinar_attend"
-    ACHIEVEMENT_UNLOCK = "achievement_unlock"
-
-
-class TransactionType(str, Enum):
-    PURCHASE = "purchase"   # Покупка товара (cash_amount < 0, pv_amount > 0)
-    BONUS = "bonus"         # Бонус за активность (cash_amount = 0, pv_amount > 0)
-    PENALTY = "penalty"     # Штраф (cash_amount = 0, pv_amount < 0)
-    ACHIEVEMENT = "achievement"  # Награда за достижение
-    REFERRAL = "referral"   # Реферальный бонус (cash_amount > 0)
-    CASH_OUT = "cash_out"   # Вывод средств (cash_amount < 0)
-    CASH_IN = "cash_in"     # Пополнение баланса (cash_amount > 0)
-
-
-class TransactionStatus(str, Enum):
-    PENDING = "pending"
-    FAILED = "failed"
-    COMPLETED = "completed"
 
 
 class TimeZoneBase(BaseModel):
@@ -210,18 +161,10 @@ class UserRegister(UserBase):
 
 
 class UserCreate(UserRegister):
-    password: str = Field(..., min_length=8, max_length=64)
     status: UserStatus = Field(default=UserStatus.ACTIVE)
     role: UserRole = Field(default=UserRole.CLIENT)
     timezone_id: Optional[int] = Field(default=1)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
-
-    @model_validator(mode="before")
-    def hash_password(cls, values):
-        password = values.get("password")
-        if password:
-            values["hashed_password"] = get_password_hash(password)
-        return values
 
 
 class UserUpdate(BaseModel):
@@ -273,11 +216,6 @@ class ProductCreate(ProductBase):
     is_collection: bool = Field(default=False)
     collection_items: Optional[List[Dict[str, Any]]] = Field(default=None)
 
-    @field_validator('webinar_link')
-    def validate_webinar_link(cls, v, values):
-        if values.get('category') == ProductCategory.WEBINAR and not v:
-            raise ValueError('Webinar link is required for webinar products')
-        return v
 
     @field_validator('price')
     def validate_price(cls, v):
@@ -358,28 +296,7 @@ class TransactionCreate(TransactionBase):
     achievement_id: Optional[uuid.UUID] = Field(default=None)
     user_id: uuid.UUID = Field(...)
 
-    @field_validator('cash_amount')
-    def validate_cash_amount(cls, v, values):
-        transaction_type = values.get('type')
-        if transaction_type == TransactionType.PURCHASE and v >= 0:
-            raise ValueError('Purchase transactions must have negative cash amount')
-        if transaction_type == TransactionType.REFERRAL and v <= 0:
-            raise ValueError('Referral transactions must have positive cash amount')
-        if transaction_type == TransactionType.CASH_OUT and v >= 0:
-            raise ValueError('Cash out transactions must have negative cash amount')
-        if transaction_type == TransactionType.CASH_IN and v <= 0:
-            raise ValueError('Cash in transactions must have positive cash amount')
-        return v
 
-    @field_validator('pv_amount')
-    def validate_pv_amount(cls, v, values):
-        transaction_type = values.get('type')
-        if transaction_type == TransactionType.PENALTY and v >= 0:
-            raise ValueError('Penalty transactions must have negative PV amount')
-        if transaction_type in [TransactionType.PURCHASE, TransactionType.BONUS,
-                              TransactionType.ACHIEVEMENT, TransactionType.REFERRAL] and v <= 0:
-            raise ValueError('This transaction type must have positive PV amount')
-        return v
 
 
 class TransactionUpdate(BaseModel):
@@ -443,6 +360,7 @@ class PurchaseResponse(BaseModel):
     new_pv_balance: float
     new_cash_balance: Decimal
     transaction_id: uuid.UUID
+
 
 class UserBalanceResponse(BaseModel):
     cash_balance: Decimal = Field(..., description="Current cash balance")

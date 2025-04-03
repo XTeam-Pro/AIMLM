@@ -48,7 +48,11 @@ def read_users(
     user_dao = UserDAO(session)
     count = user_dao.count()
     users = user_dao.find_all(skip=skip, limit=limit)
-    return UsersPublic(data=users, count=count)
+    result = []
+    for user in users:
+        result.append(UserPublic.model_validate(user))
+
+    return UsersPublic(data=result, count=count)
 
 
 @router.post(

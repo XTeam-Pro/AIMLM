@@ -1,85 +1,89 @@
 import logging
+import time
 from datetime import datetime,timezone
-from decimal import Decimal
 
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
-from app.api.deps import CommittedSessionDep, CurrentUser, UncommittedSessionDep, PurchaseServiceDep
+from app.api.deps import CommittedSessionDep, CurrentUser, UncommittedSessionDep, RedisDep
 
 from app.core.postgres.dao import (
     ProductDAO,
     UserProductInteractionDAO,
     CartItemDAO,
-    TransactionDAO,
 )
 from app.schemas.core_schemas import (
     UserProductInteractionCreate,
     InteractionType,
     CartItemCreate,
-    TransactionCreate,
-    TransactionType,
-    TransactionStatus, PurchaseResponse
 )
-from app.models.core import Transaction
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Interaction"], prefix="/interaction")
 
-
-def create_transaction(
-        session: CommittedSessionDep,
-        user_id: UUID,
-        amount: Decimal,
-        pv_amount: Decimal,
-        transaction_type: TransactionType,
-        product_id: UUID = None,
-        additional_info: dict = None
-) -> Transaction:
-    """Creates transaction record"""
-    transaction = TransactionCreate(
-        user_id=user_id,
-        cash_amount=amount,
-        pv_amount=pv_amount,
-        type=transaction_type,
-        product_id=product_id,
-        status=TransactionStatus.COMPLETED,
-        additional_info=additional_info
-    )
-    return TransactionDAO(session).add(transaction)
-
-
-@router.post("/buy", status_code=status.HTTP_201_CREATED, response_model=PurchaseResponse)
-def buy_product(
-        product_id: UUID,
-        current_user: CurrentUser,
-        purchase_service: PurchaseServiceDep
+@router.get("/get_purchased")
+def get_my_products(
+    session: UncommittedSessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 100
 ):
     """
-    Processes the purchase of a product
-
+    Returns all products info a user has bought
     """
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
+    return UserProductInteractionDAO(session).find_all(
+        skip=skip, limit=limit, filters={"user_id": current_user.id, "interaction_type": InteractionType.PURCHASE}
+    )
 
-    try:
-        return purchase_service.process_purchase(
-            user_id=current_user.id,
-            product_id=product_id
-        )
-    except HTTPException as he:
-        return {"message": "HTTP Error", "status": he.status_code, "detail": str(he.detail)}
-    except Exception as e:
-        logger.error(f"Purchase failed: {str(e)}", exc_info=True)
+@router.post("/track_view", status_code=status.HTTP_201_CREATED)
+def track_product_view(
+        session: CommittedSessionDep,
+        product_id: UUID,
+        current_user: CurrentUser,
+        redis: RedisDep,
+):
+    """
+    Track product view stores view timestamp and maintains viewed products list
+    """
+    if not current_user:
         raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
         )
+    user_view_key = f"user:{current_user.id}:views"
+    product_viewers_key = f"product:{product_id}:viewers"
+    try:
+        product = ProductDAO(session).find_one_or_none_by_id(product_id)
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found"
+            )
+        redis.zadd(user_view_key, {str(product_id): time.time()}, nx=True) # only unique keys
 
+        redis.sadd(product_viewers_key, str(current_user.id))
+        # TTL = 2 hours
+        redis.expire(user_view_key, 7200)
+        redis.expire(product_viewers_key, 7200)
 
+        return {
+            "message": "View tracked successfully",
+            "product_id": str(product_id),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"View tracking failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to track view"
+        )
 @router.post("/add_to_cart", status_code=status.HTTP_201_CREATED)
 async def add_to_cart(
         product_id: UUID,
@@ -93,26 +97,21 @@ async def add_to_cart(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
-
     product = ProductDAO(session).find_one_or_none_by_id(product_id)
     if not product or not product.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not available"
         )
-
-    # Check existing cart item
     existing_item = CartItemDAO(session).find_one_or_none({
         "user_id": current_user.id,
         "product_id": product.id
     })
-
     if existing_item:
         existing_item.quantity += quantity
         session.add(existing_item)
         session.commit()
         return {"message": "Cart item quantity updated"}
-
     # Register cart interaction
     UserProductInteractionDAO(session).add(UserProductInteractionCreate(
         user_id=current_user.id,
@@ -121,14 +120,12 @@ async def add_to_cart(
         pv_awarded=0,
         additional_info={"added_at": datetime.now(timezone.utc).isoformat()}
     ))
-
     # Create cart item
     item = CartItemDAO(session).add(CartItemCreate(
         user_id=current_user.id,
         product_id=product.id,
         quantity=quantity
     ))
-
     return {
         "message": "Product added to cart",
         "cart_item_id": str(item.id),
@@ -148,25 +145,19 @@ async def add_to_favorites(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
-
     product = ProductDAO(session).find_one_or_none_by_id(product_id)
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-
-    # Check if already in favorites
     existing = UserProductInteractionDAO(session).find_one_or_none({
         "user_id": current_user.id,
         "product_id": product.id,
         "interaction_type": InteractionType.FAVORITE
     })
-
     if existing:
         return {"message": "Product already in favorites"}
-
-    # Add to favorites
     UserProductInteractionDAO(session).add(UserProductInteractionCreate(
         user_id=current_user.id,
         product_id=product.id,
@@ -176,7 +167,6 @@ async def add_to_favorites(
     ))
 
     return {"message": "Product added to favorites"}
-
 
 @router.delete("/remove_from_favorites/{product_id}", status_code=status.HTTP_200_OK)
 async def remove_from_favorites(
@@ -247,22 +237,25 @@ async def remove_from_cart(
         session: CommittedSessionDep,
         current_user: CurrentUser
 ):
-    """Remove item from cart"""
+    """Remove product from cart"""
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
 
-    deleted_count = CartItemDAO(session).delete({
+    deleted_count = CartItemDAO(session).delete(filters={
         "user_id": current_user.id,
         "product_id": product_id
     })
-
+    UserProductInteractionDAO(session).delete(filters={
+        "user_id": current_user.id,
+        "interaction_type": InteractionType.CART_ADD,
+        "product_id": product_id})
     if not deleted_count:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Item not found in cart"
+            detail="Product not found in cart"
         )
 
-    return {"message": "Item removed from cart"}
+    return {"message": "Product removed from cart"}

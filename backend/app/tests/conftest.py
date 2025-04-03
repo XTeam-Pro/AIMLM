@@ -1,5 +1,4 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
+
 from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
@@ -59,7 +58,8 @@ def test_user(db: Session) -> Generator[User, None, None]:
         "postcode": "12345",
         "role": "client",
         "status": "active",
-        "balance": 0.0
+        "cash_balance": 0.0,
+        "pv_balance": 0.0
     }
 
     user = UserDAO(db).add(UserRegister(**user_data))

@@ -2,9 +2,23 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException
+from fastapi.exceptions import ResponseValidationError
 
-from app.core.postgres.dao import ProductDAO, UserDAO, CartItemDAO, UserProductInteractionDAO, TransactionDAO
-from app.schemas.core_schemas import PurchaseResponse, UserProductInteractionCreate, InteractionType, TransactionType
+from app.core.postgres.dao import (
+    ProductDAO,
+    UserDAO,
+    CartItemDAO,
+    UserProductInteractionDAO,
+    TransactionDAO
+)
+from app.schemas.core_schemas import (
+    PurchaseResponse,
+    UserProductInteractionCreate,
+    InteractionType,
+    TransactionType,
+    TransactionCreate,
+    TransactionStatus
+)
 
 
 class PurchaseService:
@@ -18,6 +32,7 @@ class PurchaseService:
 
     def process_purchase(self, user_id: UUID, product_id: UUID) -> PurchaseResponse:
         """Base method for purchase handling"""
+
         product = self._validate_product(product_id)
         user = self._get_user(user_id)
 
@@ -29,9 +44,9 @@ class PurchaseService:
 
         return PurchaseResponse(
             message="Purchase successful",
-            pv_earned=float(product.pv_value),
-            new_pv_balance=float(updated_user.pv_balance),
-            new_cash_balance=float(updated_user.cash_balance),
+            pv_earned=product.pv_value,
+            new_pv_balance=updated_user.pv_balance,
+            new_cash_balance=updated_user.cash_balance,
             transaction_id=transaction.id
         )
 
@@ -46,7 +61,7 @@ class PurchaseService:
         """Gets user"""
         user = self._user_dao.find_one_or_none_by_id(user_id)
         if not user:
-            raise ValueError("User not found")
+            raise HTTPException(status_code=404, detail="User not found")
         return user
 
     def _check_user_funds(self, user, product_price):
@@ -73,17 +88,19 @@ class PurchaseService:
 
     def _create_transaction(self, user_id: UUID, product):
         """Creates a transaction"""
-        return self._transaction_dao.create_transaction(
+        transaction = TransactionCreate(
             user_id=user_id,
-            amount=-product.price,
+            cash_amount=product.price,
             pv_amount=product.pv_value,
-            transaction_type=TransactionType.PURCHASE,
+            type=TransactionType.PURCHASE,
             product_id=product.id,
+            status=TransactionStatus.COMPLETED,
             additional_info={
                 "action": "product_purchase",
                 "product_price": float(product.price)
             }
         )
+        return self._transaction_dao.add(transaction)
 
     def _remove_from_cart(self, user_id: UUID, product_id: UUID):
         """Removes a product from the cart"""

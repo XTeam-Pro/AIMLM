@@ -1,7 +1,7 @@
-
+from sqlmodel import Session
 
 from app.api.deps import CommittedSessionDep
-from app.core.postgres.dao import UserDAO, TimeZoneDAO
+from app.core.postgres.dao import TimeZoneDAO, UserDAO
 
 from app.schemas.core_schemas import UserCreate,TimeZoneCreate
 
@@ -9,8 +9,8 @@ from app.schemas.core_schemas import UserCreate,TimeZoneCreate
 from app.core.postgres.config import settings
 from app.schemas.core_schemas import UserRole, UserStatus
 from app.core.security import get_password_hash
-def init_db(session: CommittedSessionDep) -> None:
-        
+def init_db(session: Session) -> None:
+
         timezone_dao = TimeZoneDAO(session)
         timezones = [
             {"name": "UTC", "offset": "+00:00"},
@@ -23,9 +23,7 @@ def init_db(session: CommittedSessionDep) -> None:
             timezone_model = TimeZoneCreate(**timezone_data)
             if not timezone_dao.find_one_or_none({"name": timezone_model.name}):
                 timezone_dao.add(timezone_model)
-                session.commit()
-
-
+        session.commit()
         user = UserDAO(session).find_one_or_none({"email": settings.FIRST_SUPERUSER})
         if not user:
             superuser_data = {
@@ -38,10 +36,11 @@ def init_db(session: CommittedSessionDep) -> None:
                 "postcode": "ADMIN01",
                 "role": UserRole.ADMIN.value,
                 "status": UserStatus.ACTIVE.value,
-                "balance": 0.0,
+                "pv_balance": 0.0,
+                "cash_balance": 1000,
                 "timezone_id": 1,
                 "mentor_id": None
             }
             user_in = UserCreate(**superuser_data)
             UserDAO(session).add(user_in)
-            session.commit()
+        session.commit()

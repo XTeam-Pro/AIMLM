@@ -50,12 +50,12 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "test_name"
     SENTRY_DSN: HttpUrl | None = None
-    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_SERVER: str = "db"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "1234"
+    POSTGRES_PASSWORD: str = "changethis"
     POSTGRES_DB: str = "app"
-    REDIS_URL: str = "http://localhost:6379"
+    REDIS_URL: str = "redis://redis:6379"
     MONGO_URL: str = "mongodb://mongo_db:27017/"
     MONGO_DB: str = "vilavi_shop_db"
     MONGO_INIT: int = 1
@@ -96,9 +96,9 @@ class Settings(BaseSettings):
         return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)
 
     # TODO: update type to EmailStr when sqlmodel supports it
-    EMAIL_TEST_USER: str = "test@example.com"
+    EMAIL_TEST_USER: str = "aleks@google.com"
     # TODO: update type to EmailStr when sqlmodel supports it
-    FIRST_SUPERUSER: str = "admin@example.com"
+    FIRST_SUPERUSER: str = "admin@google.com"
     FIRST_SUPERUSER_PASSWORD: str = "String123"
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
