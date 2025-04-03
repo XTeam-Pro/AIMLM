@@ -8,7 +8,8 @@ from email_validator import validate_email, EmailNotValidError
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 
 from app.schemas.gamification_schemas import AchievementPublic
-from app.schemas.types import UserRole, UserStatus, ProductCategory, InteractionType, TransactionType, TransactionStatus
+from app.schemas.types import UserRole, UserStatus, ProductCategory, InteractionType, TransactionType, \
+    TransactionStatus, TimeZoneNames
 
 
 class Token(BaseModel):
@@ -54,7 +55,7 @@ class Message(BaseModel):
 
 
 class TimeZoneBase(BaseModel):
-    name: str = Field(..., max_length=50)
+    name: TimeZoneNames = Field(default=TimeZoneNames.UTC)
     offset: str = Field(..., max_length=6, pattern=r"^[+-]\d{2}:\d{2}$")
 
 
@@ -63,12 +64,11 @@ class TimeZoneCreate(TimeZoneBase):
 
 
 class TimeZoneUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, max_length=50)
+    name: TimeZoneNames = Field(default=TimeZoneNames.UTC)
     offset: Optional[str] = Field(default=None, max_length=6, pattern=r"^[+-]\d{2}:\d{2}$")
 
 
 class TimeZonePublic(TimeZoneBase):
-    id: int = Field(...)
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -163,7 +163,7 @@ class UserRegister(UserBase):
 class UserCreate(UserRegister):
     status: UserStatus = Field(default=UserStatus.ACTIVE)
     role: UserRole = Field(default=UserRole.CLIENT)
-    timezone_id: Optional[int] = Field(default=1)
+    timezone: TimeZoneNames = Field(default=TimeZoneNames.UTC)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
 
 
@@ -172,8 +172,8 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=20, pattern=r"^\+?[1-9]\d{1,14}$")
     full_name: Optional[str] = Field(default=None, max_length=100)
     role: Optional[UserRole] = Field(default=None)
-    status: Optional[UserStatus] = Field(default=None)
-    timezone_id: Optional[int] = Field(default=None)
+    status: UserStatus = Field(default=None)
+    timezone: TimeZoneNames = Field(...,)
     mentor_id: Optional[uuid.UUID] = Field(default=None)
     cash_balance: Optional[float] = Field(default=None, ge=0)
     pv_balance: Optional[float] = Field(default=None, ge=0)
@@ -185,13 +185,13 @@ class UserUpdateMe(BaseModel):
 
 
 class UserPublic(UserBase):
-    id: uuid.UUID = Field(...)
-    role: UserRole = Field(...)
-    status: UserStatus = Field(...)
+    id: uuid.UUID = Field(...,)
+    role: UserRole = Field(...,)
+    status: UserStatus = Field(...,)
     cash_balance: Decimal = Field(..., ge=0, description="Real money balance")
     pv_balance: Decimal = Field(..., ge=0, description="Personal Volume points balance")
-    registration_date: datetime = Field(...)
-    timezone: Optional[TimeZonePublic] = Field(default=None)
+    registration_date: datetime = Field(...,)
+    timezone: TimeZoneNames = Field(...,)
     achievements: List[AchievementPublic] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 

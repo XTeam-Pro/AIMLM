@@ -1,8 +1,8 @@
-"""initialize models
+"""initalize models 
 
-Revision ID: 0a2a83c18740
-Revises:
-Create Date: 2025-04-03 08:54:02.217264
+Revision ID: 0ac014550fe2
+Revises: 
+Create Date: 2025-04-03 15:53:35.174926
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = '0a2a83c18740'
+revision = '0ac014550fe2'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -23,7 +23,7 @@ def upgrade():
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
-    sa.Column('tier', sa.Enum('BRONZE', 'SILVER', 'GOLD', 'PLATINUM', name='achievement_tier'), nullable=False),
+    sa.Column('tier', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('points_required', sa.Float(), nullable=False),
     sa.Column('image_url', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
     sa.Column('is_secret', sa.Boolean(), nullable=False),
@@ -45,10 +45,9 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('time_zones',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=50), nullable=False),
+    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('offset', sqlmodel.sql.sqltypes.AutoString(length=6), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('name')
     )
     op.create_table('users',
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
@@ -61,13 +60,12 @@ def upgrade():
     sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('cash_balance', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('pv_balance', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('timezone_id', sa.Integer(), nullable=True),
+    sa.Column('timezone', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('mentor_id', sa.Uuid(), nullable=True),
     sa.Column('registration_date', sa.DateTime(), nullable=False),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('hashed_password', sqlmodel.sql.sqltypes.AutoString(length=128), nullable=False),
     sa.ForeignKeyConstraint(['mentor_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['timezone_id'], ['time_zones.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)

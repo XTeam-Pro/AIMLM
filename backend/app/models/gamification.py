@@ -16,7 +16,7 @@ class Achievement(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str = Field(max_length=100)
     description: str = Field(max_length=500)
-    tier: AchievementTier
+    tier: str = Field(max_length=100)
     points_required: float = Field(ge=0)
     image_url: str = Field(max_length=500) # different images for different achievement tiers
     is_secret: bool = Field(default=False)

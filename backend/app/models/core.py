@@ -10,15 +10,13 @@ from sqlmodel import SQLModel, Field, Relationship
 
 from app.models.gamification import UserAchievement, Achievement
 from app.schemas.core_schemas import UserStatus, UserRole, TransactionStatus
-from app.schemas.types import TransactionType
+from app.schemas.types import TimeZoneNames
 
 
 class TimeZone(SQLModel, table=True):
     __tablename__ = "time_zones"
-    id: int = Field(primary_key=True)
-    name: str = Field(max_length=50)
+    name: str = Field(primary_key=True)
     offset: str = Field(max_length=6, regex=r"^[+-]\d{2}:\d{2}$")  # e.g. "+03:00"
-
 
 
 
@@ -33,7 +31,7 @@ class UserBase(SQLModel):
     status: str = Field(default=UserStatus.ACTIVE)
     cash_balance: Decimal = Field(default=Decimal(0), max_digits=12, decimal_places=2)
     pv_balance: Decimal = Field(default=Decimal(0), max_digits=12, decimal_places=2)
-    timezone_id: Optional[int] = Field(default=None, foreign_key="time_zones.id")
+    timezone: str = Field(max_length=100)
     mentor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -44,7 +42,6 @@ class User(UserBase, table=True):
     hashed_password: str = Field(max_length=128)
 
     # Relationships
-    timezone: Optional["TimeZone"] = Relationship()
     mentor: Optional["User"] = Relationship(
         back_populates="mentees",
         sa_relationship_kwargs={"remote_side": "User.id"}
@@ -119,7 +116,7 @@ class Transaction(SQLModel, table=True):
     product_id: Optional[uuid.UUID] = Field(default=None, foreign_key="products.id")
     achievement_id: Optional[uuid.UUID] = Field(default=None, foreign_key="achievements.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    additional_info: Optional[Dict[str, Any]] = Field(default=None, sa_type=JSON)
+    additional_info: Optional[dict[str, Any]] = Field(default=None, sa_type=JSON)
 
     # Relationships
     user: "User" = Relationship(back_populates="transactions")
