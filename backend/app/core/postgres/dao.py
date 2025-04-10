@@ -5,9 +5,9 @@ from uuid import UUID
 from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
 from app.models.mlm import UserMLM, Bonus
-from app.models.user import User, Product, UserProductInteraction, CartItem, Transaction,TimeZone
+from app.models.user import User, Product, UserProductInteraction, Transaction,TimeZone
 from app.models.gamification import Achievement, UserAchievement, Challenge, Team, UserChallenge
-
+from app.models.common  import CartItem
 
 class UserDAO(BaseDAO[User]):
     model = User

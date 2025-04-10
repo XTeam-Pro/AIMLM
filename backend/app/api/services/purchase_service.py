@@ -13,7 +13,7 @@ from app.core.postgres.dao import (
     CartItemDAO,
     TransactionDAO
 )
-from app.schemas.core_schemas import (
+from app.schemas.common import (
     TransactionCreate,
 )
 from app.schemas.types.common_types import TransactionType, TransactionStatus

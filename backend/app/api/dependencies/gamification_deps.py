@@ -3,8 +3,8 @@ from datetime import timezone, datetime, timedelta
 from sqlmodel import Session
 
 from app.core.postgres.dao import UserDAO, UserAchievementDAO, UserChallengeDAO, TransactionDAO
-from app.schemas.types import LeaderboardPeriod, TransactionType
-
+from app.schemas.types.gamification_types import LeaderboardPeriod
+from app.schemas.types.common_types import TransactionType
 
 def get_period_filter(period: LeaderboardPeriod) -> tuple | None:
     """Helper to create time filter based on period"""

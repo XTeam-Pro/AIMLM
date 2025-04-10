@@ -46,6 +46,10 @@ class UserChallenge(SQLModel, table=True):
     challenge_id: uuid.UUID = Field(foreign_key="challenges.id")
     user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     team_id: Optional[uuid.UUID] = Field(default=None, foreign_key="challenge_teams.id")
+    team: Optional["Team"] = Relationship(
+        back_populates="challenges",
+        sa_relationship_kwargs={"foreign_keys": "[UserChallenge.team_id]"}
+    )
     current_progress: Decimal = Field(default=Decimal(0))
     is_completed: bool = Field(default=False)
     completed_at: Optional[datetime] = Field(default=None)
@@ -63,6 +67,12 @@ class Team(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    captain: "User" = Relationship(back_populates="captained_teams")
-    members: List["User"] = Relationship(back_populates="team")
+    captain: "User" = Relationship(
+        back_populates="captained_teams",
+        sa_relationship_kwargs={"foreign_keys": "[Team.captain_id]"}
+    )
+    members: List["User"] = Relationship(
+        back_populates="team",
+        sa_relationship_kwargs={"foreign_keys": "[User.team_id]"}
+    )
     challenges: List["UserChallenge"] = Relationship(back_populates="team")

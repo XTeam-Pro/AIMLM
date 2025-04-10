@@ -101,8 +101,13 @@ class Purchase(SQLModel, table=True):
     transaction_id: Optional[uuid.UUID] = Field(default=None, foreign_key="transactions.id")  # Link to Transaction
 
     # Relationships
-    user: "User" = Relationship(back_populates="purchases")
-    client: Optional["User"] = Relationship()  # Optional, for when purchases are made by a client
+    user: "User" = Relationship(
+        back_populates="purchases",
+        sa_relationship_kwargs={"foreign_keys": "[Purchase.user_id]"}
+    )
+    client: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Purchase.client_id]"}
+    ) # Optional, for when purchases are made by a client
     transaction: Optional["Transaction"] = Relationship()  # Link to the associated transaction
     items: list["PurchaseItem"] = Relationship(back_populates="purchase")
 
@@ -132,7 +137,14 @@ class Transaction(SQLModel, table=True):
     additional_info: Optional[dict[str, Any]] = Field(default=None, sa_type=JSON)
 
     # Relationships
-    buyer: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Transaction.buyer_id]"})
-    seller: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Transaction.seller_id]"})
+    buyer: "User" = Relationship(
+        back_populates="buyer_transactions",
+        sa_relationship_kwargs={"foreign_keys": "[Transaction.buyer_id]"}
+    )
+
+    seller: "User" = Relationship(
+        back_populates="seller_transactions",
+        sa_relationship_kwargs={"foreign_keys": "[Transaction.seller_id]"}
+    )
     product: Optional["Product"] = Relationship()
     achievement: Optional["Achievement"] = Relationship()

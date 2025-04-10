@@ -26,7 +26,10 @@ class UserMLM(SQLModel, table=True):
     sponsor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     placement_sponsor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
 
-    user: "User" = Relationship(back_populates="mlm_data")
+    user: "User" = Relationship(
+        back_populates="mlm_data",
+        sa_relationship_kwargs={"foreign_keys": "[UserMLM.user_id]"}
+    )
 
     business_centers: list["BusinessCenter"] = Relationship(back_populates="owner")
     bonuses: list["Bonus"] = Relationship(back_populates="user")

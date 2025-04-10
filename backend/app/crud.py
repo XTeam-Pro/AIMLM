@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from app.core.security import get_password_hash
 from app.models.user import User
-from app.schemas.core_schemas import UserCreate, UserUpdate
+from app.schemas.users import UserCreate, UserUpdate
 
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:

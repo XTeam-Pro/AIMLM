@@ -3,7 +3,7 @@ from sqlmodel import Session
 from app.core.postgres.dao import TimeZoneDAO, UserDAO
 
 
-
+from app.schemas.types.gamification_types import RankType
 
 from app.core.postgres.config import settings
 
@@ -42,7 +42,8 @@ def init_db(session: Session) -> None:
         if not timezone_dao.find_one_or_none({"name": timezone_model.name}):
             timezone_dao.add(timezone_model)
     session.commit()
-    user = UserDAO(session).find_one_or_none({"email": settings.FIRST_SUPERUSER})
+    user_dao = UserDAO(session)
+    user = user_dao.find_one_or_none({"email": settings.FIRST_SUPERUSER})
     if not user:
         superuser_data = {
             "email": settings.FIRST_SUPERUSER,
@@ -52,14 +53,6 @@ def init_db(session: Session) -> None:
             "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
             "address": "123,Admin St,AdminCity",
             "postcode": "ADMIN01",
-            "role": UserRole.ADMIN,
-            "status": UserStatus.ACTIVE,
-            "pv_balance": 0.0,
-            "cash_balance": 1000,
-            "mentees_count": 0,
-            "timezone": TimeZoneNames.UTC,
-            "mentor_id": None
         }
-        user_in = UserCreate(**superuser_data)
-        UserDAO(session).add(user_in)
+        user_dao.add(superuser_data)
     session.commit()

@@ -22,8 +22,8 @@ from app.core.postgres.session_handler import (
     get_session_without_commit
 )
 from app.models.user import User
-from app.schemas.core_schemas import TokenPayload
-from app.schemas.types import LeaderboardPeriod
+from app.schemas.auth import TokenPayload
+from app.schemas.types.gamification_types import LeaderboardPeriod
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"

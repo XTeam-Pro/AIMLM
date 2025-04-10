@@ -16,7 +16,7 @@ class ProductBase(BaseModel):
     category: ProductCategory
     price: float
     pv_value: float
-
+    webinar_link: Optional[str]
     @field_validator('price')
     def validate_price(cls, v):
         if v <= 0:

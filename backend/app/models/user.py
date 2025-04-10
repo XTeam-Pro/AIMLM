@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlmodel import SQLModel, Field, Relationship
 
-from app.models.common import Transaction, UserProductInteraction, Product, Purchase
+from app.models.common import Transaction, UserProductInteraction, Product, Purchase,CartItem
 from app.models.gamification import Team
 from app.models.mlm import UserMLM
 
@@ -41,14 +41,35 @@ class User(SQLModel, table=True):
     mentees: list["User"] = Relationship(back_populates="mentor")
 
     team_id: Optional[uuid.UUID] = Field(default=None, foreign_key="challenge_teams.id")
-    team: Optional[Team] = Relationship(back_populates="members")
-    captained_teams: list[Team] = Relationship(back_populates="captain")
+    team: Optional[Team] = Relationship(
+        back_populates="members",
+        sa_relationship_kwargs={"foreign_keys": "[User.team_id]"}
+    )
+    captained_teams: list[Team] = Relationship(
+        back_populates="captain",
+        sa_relationship_kwargs={"foreign_keys": "[Team.captain_id]"}
+    )
 
-    purchases: list[Purchase] = Relationship(back_populates="user")
-    transactions: list[Transaction] = Relationship(back_populates="user")
+    purchases: list[Purchase] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[Purchase.user_id]"}
+    )
+    buyer_transactions: list[Transaction] = Relationship(
+        back_populates="buyer",
+        sa_relationship_kwargs={"foreign_keys": "[Transaction.buyer_id]"}
+    )
+
+    seller_transactions: list[Transaction] = Relationship(
+        back_populates="seller",
+        sa_relationship_kwargs={"foreign_keys": "[Transaction.seller_id]"}
+    )
     interactions: list[UserProductInteraction] = Relationship(back_populates="user")
 
-    mlm_data: Optional[UserMLM] = Relationship(back_populates="user")
+    mlm_data: Optional[UserMLM] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[UserMLM.user_id]"}
+    )
+    cart_items: list[CartItem] = Relationship(back_populates="user")
 
 
 

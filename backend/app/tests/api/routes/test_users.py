@@ -9,7 +9,7 @@ from sqlmodel import Session
 from app.core.postgres.config import settings
 from app.core.postgres.dao import UserDAO
 from app.core.security import verify_password, get_password_hash
-from app.schemas.core_schemas import UserRegister
+from app.schemas.users import UserRegister
 from app.schemas.types import UserRole, UserStatus
 from app.tests.crud.test_user import create_test_user_data
 
