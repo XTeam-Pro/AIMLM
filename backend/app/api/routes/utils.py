@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_current_active_superuser
-from app.schemas.core_schemas import Message
+from app.api.dependencies.deps import get_current_active_superuser
+from app.schemas.common import Message
 
 from app.utils import generate_test_email, send_email
 

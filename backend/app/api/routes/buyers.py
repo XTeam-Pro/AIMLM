@@ -7,11 +7,14 @@ from fastapi import APIRouter, HTTPException
 
 from starlette import status
 
-from app.api.deps import CurrentUser, RedisDep, UncommittedSessionDep, PurchaseServiceDep
-from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO
-from app.models.core import Product
-from app.schemas.core_schemas import InteractionType, PurchaseResponse
+from app.api.dependencies.buyer_deps import PurchaseServiceDep, SaleServiceDep
+from app.api.dependencies.deps import CurrentUser, RedisDep, UncommittedSessionDep
+from app.api.services.purchase_service import PurchaseResponse
+from app.api.services.sale_service import SaleResponse
+from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO, TransactionDAO
+from app.models.user import Product
 
+from app.schemas.types.common_types import InteractionType, TransactionType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,7 +60,37 @@ def get_sorted_products(
             detail="Internal server error"
         )
 
-@router.post("/purchase", status_code=status.HTTP_201_CREATED, response_model=PurchaseResponse)
+@router.post("/sell", status_code=status.HTTP_200_OK, response_model=SaleResponse)
+def sell_product(
+        product_id: UUID,
+        buyer_id: UUID,
+        current_user: CurrentUser,
+        sale_service: SaleServiceDep
+):
+    """
+    Processes the sale of a product
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    try:
+        return sale_service.process_sale(
+            distributor_id=current_user.id,
+            product_id=product_id,
+            buyer_id=buyer_id
+        )
+    except HTTPException as he:
+        return {"message": "HTTP Error", "status": he.status_code, "detail": str(he.detail)}
+    except Exception as e:
+        logger.error(f"Sale failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@router.post("/purchase", status_code=status.HTTP_200_OK, response_model=PurchaseResponse)
 def buy_product(
         product_id: UUID,
         current_user: CurrentUser,
@@ -260,9 +293,9 @@ def get_recommendations_by_purchase(
             detail="Authentication required"
         )
     try:
-        purchased = UserProductInteractionDAO(session).find_all(filters={
+        purchased = TransactionDAO(session).find_all(filters={
             "user_id": current_user.id,
-            "interaction_type": InteractionType.PURCHASE
+            "transaction_type": TransactionType.PRODUCT_PURCHASE
         })
         purchased_ids = [item.product_id for item in purchased if item.product_id]
         if not purchased_ids:

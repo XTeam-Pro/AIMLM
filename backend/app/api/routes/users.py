@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 
-from app.api.deps import (
+from app.api.dependencies.deps import (
     CurrentUser,
     get_current_active_superuser,
     CommittedSessionDep,
@@ -14,19 +14,14 @@ from app.core.postgres.config import settings
 from app.core.postgres.dao import (
     UserProductInteractionDAO,
     UserDAO,
-    CartItemDAO
+    CartItemDAO, UserMLMDAO
 )
 from app.core.security import get_password_hash, verify_password
-from app.schemas.core_schemas import (
-    UsersPublic,
-    UserPublic,
-    UserCreate,
-    UserUpdateMe,
-    Message,
-    UpdatePassword,
-    UserUpdate,
-    UserRegister
-)
+from app.schemas.auth import UpdatePassword
+from app.schemas.common import Message
+from app.schemas.mlm import UserMLMCreate
+from app.schemas.users import UsersPublic, UserPublic, UserCreate, UserUpdateMe, UserRegister, UserUpdate
+
 from app.utils import generate_new_account_email, send_email
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -175,7 +170,8 @@ def delete_user_me(
 @router.post("/signup", response_model=UserPublic)
 def register_user(
         session: CommittedSessionDep,
-        user_in: UserRegister
+        user_in: UserRegister,
+        user_mlm: UserMLMCreate
 ) -> Any:
     """
     Create new user without the need to be logged in.
@@ -186,8 +182,21 @@ def register_user(
             status_code=400,
             detail="The user with this email already exists in the system",
         )
+
     user_create = UserCreate(**user_in.model_dump())
-    return user_dao.add(user_create)
+    user = user_dao.add(user_create)
+
+    # Create a new entry in the UserMLM for new user
+    user_mlm_dao = UserMLMDAO(session)
+    user_mlm_create = UserMLMCreate(
+        user_id=user.id,
+        contract_type=user_mlm.contract_type,
+        current_rank=user_mlm.current_rank,
+        current_club=user_mlm.current_club
+    )
+    user_mlm_dao.add(user_mlm_create)
+
+    return user
 
 @router.get("/{user_id}", response_model=UserPublic)
 def read_user_by_id(

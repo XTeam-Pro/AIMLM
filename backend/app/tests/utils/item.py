@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from random import choice, randint
 from sqlmodel import Session
 
-from app.models.core import UserProductInteraction
+from app.models.user import UserProductInteraction
 from app.tests.utils.user import create_random_user
 from app.tests.utils.product import create_random_product
 

@@ -9,7 +9,7 @@ from app.core.postgres.dao import UserDAO
 from app.core.security import get_password_hash, verify_password
 
 from app.schemas.core_schemas import UserRegister
-from app.models.core import User
+from app.models.user import User
 from app.schemas.types import UserRole, UserStatus
 
 

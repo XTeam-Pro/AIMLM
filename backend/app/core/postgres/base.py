@@ -91,7 +91,7 @@ class BaseDAO(Generic[T]):
             filters: Optional[dict[str, Any]] = None,
             order_by: Optional[str] = None
     ) -> List[T]:
-        """Get all records matching optional filters."""
+        """Get all records matching optional filters and order_by."""
         try:
             if limit > 1000:
                 raise ValueError("Limit cannot exceed 1000")
@@ -110,6 +110,22 @@ class BaseDAO(Generic[T]):
                             conditions.append(getattr(self.model, field).in_(operand))
                         elif operator == "not_in":
                             conditions.append(~getattr(self.model, field).in_(operand))
+                        elif operator == "ge":
+                            conditions.append(getattr(self.model, field) >= operand)
+                        elif operator == "le":
+                            conditions.append(getattr(self.model, field) <= operand)
+                        elif operator == "gt":
+                            conditions.append(getattr(self.model, field) > operand)
+                        elif operator == "lt":
+                            conditions.append(getattr(self.model, field) < operand)
+                        elif operator == "eq":
+                            conditions.append(getattr(self.model, field) == operand)
+                        elif operator == "ne":  # not equal
+                            conditions.append(getattr(self.model, field) != operand)
+                        elif operator == "like":
+                            conditions.append(getattr(self.model, field).like(operand))
+                        elif operator == "ilike":
+                            conditions.append(getattr(self.model, field).ilike(operand))
                         else:
                             raise ValueError(f"Unsupported operator: {operator}")
                     else:

@@ -1,12 +1,12 @@
+
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from starlette import status
 
-
-from app.api.deps import CommittedSessionDep
-from app.core.security import get_password_hash
-from app.models.core import User
-from app.schemas.core_schemas import UserPublic,UserCreate
+from app.api.dependencies.deps import CommittedSessionDep
+from app.core.postgres.dao import UserDAO
+from app.schemas.users import UserCreate, UserPublic
 
 router = APIRouter(tags=["private"], prefix="/private")
 
@@ -19,21 +19,10 @@ def create_user(user_in: UserCreate, session: CommittedSessionDep) -> Any:
     """
     Create a new user.
     """
-    user = User(
-        email=user_in.email,
-        username=user_in.username,
-        full_name=user_in.full_name,
-        phone=user_in.phone,
-        hashed_password=get_password_hash(user_in.hashed_password),
-        postcode=user_in.postcode,
-        address=user_in.address,
-        cash_balance=user_in.cash_balance,
-        pv_balance=user_in.pv_balance,
-        role=user_in.role,
-        status=user_in.status
-    )
-
-    session.add(user)
-    session.commit()
-
+    if UserDAO(session).find_one_or_none(filters={"email": user_in.email}):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Such user already exists"
+        )
+    user = UserDAO(session).add(user_in)
     return user

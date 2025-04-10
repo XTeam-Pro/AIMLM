@@ -4,8 +4,10 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from app.models.core import User, Product, UserProductInteraction, Transaction, CartItem
-from app.models.gamification import Achievement, UserAchievement
+from app.models.user import *
+from app.models.gamification import *
+from app.models.mlm import *
+from app.models.common import *
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

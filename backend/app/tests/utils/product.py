@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from random import randint, choice
 
-from app.models.core import Product
+from app.models.user import Product
 
 
 def create_random_product(db: Session, **kwargs) -> Product:

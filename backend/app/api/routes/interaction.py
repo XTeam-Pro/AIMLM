@@ -4,19 +4,15 @@ from datetime import datetime,timezone
 
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
-from app.api.deps import CommittedSessionDep, CurrentUser, UncommittedSessionDep, RedisDep
+from app.api.dependencies.deps import CommittedSessionDep, CurrentUser, UncommittedSessionDep, RedisDep
 
 from app.core.postgres.dao import (
     ProductDAO,
     UserProductInteractionDAO,
-    CartItemDAO,
+    CartItemDAO, TransactionDAO,
 )
-from app.schemas.core_schemas import (
-    UserProductInteractionCreate,
-    InteractionType,
-    CartItemCreate,
-)
-
+from app.schemas.common import UserProductInteractionCreate, CartItemCreate
+from app.schemas.types.common_types import InteractionType, TransactionType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,8 +33,8 @@ def get_my_products(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
-    return UserProductInteractionDAO(session).find_all(
-        skip=skip, limit=limit, filters={"user_id": current_user.id, "interaction_type": InteractionType.PURCHASE}
+    return TransactionDAO(session).find_all(
+        skip=skip, limit=limit, filters={"user_id": current_user.id, "transaction_type": TransactionType.PRODUCT_PURCHASE}
     )
 
 @router.post("/track_view", status_code=status.HTTP_201_CREATED)
@@ -117,7 +113,6 @@ async def add_to_cart(
         user_id=current_user.id,
         product_id=product.id,
         interaction_type=InteractionType.CART_ADD,
-        pv_awarded=0,
         additional_info={"added_at": datetime.now(timezone.utc).isoformat()}
     ))
     # Create cart item
@@ -162,7 +157,6 @@ async def add_to_favorites(
         user_id=current_user.id,
         product_id=product.id,
         interaction_type=InteractionType.FAVORITE,
-        pv_awarded=0,
         additional_info={"added_at": datetime.now(timezone.utc).isoformat()}
     ))
 

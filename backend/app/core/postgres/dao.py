@@ -1,11 +1,12 @@
+from _pydecimal import Decimal
 from typing import Optional
 from uuid import UUID
 
 from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
-from app.models.core import User, Product, UserProductInteraction, CartItem, Transaction,TimeZone
-
-from app.schemas.core_schemas import TransactionType, TransactionCreate, TransactionStatus
+from app.models.mlm import UserMLM, Bonus
+from app.models.user import User, Product, UserProductInteraction, CartItem, Transaction,TimeZone
+from app.models.gamification import Achievement, UserAchievement, Challenge, Team, UserChallenge
 
 
 class UserDAO(BaseDAO[User]):
@@ -20,7 +21,7 @@ class UserDAO(BaseDAO[User]):
             return None
         return user
 
-    def update_cash_balance(self, user_id: UUID, amount: float) -> User:
+    def update_cash_balance(self, user_id: UUID, amount: Decimal) -> User:
         """Atomic user cash balance update"""
         user = self.find_one_or_none_by_id(user_id)
         if not user:
@@ -29,7 +30,7 @@ class UserDAO(BaseDAO[User]):
         user.cash_balance += amount
         return self.update({"id": user_id}, {"cash_balance": user.cash_balance})
 
-    def update_pv_balance(self, user_id: UUID, amount: float):
+    def update_pv_balance(self, user_id: UUID, amount: Decimal):
         """Atomic user pv balance update"""
         user = self.find_one_or_none_by_id(user_id)
         if not user:
@@ -48,25 +49,6 @@ class CartItemDAO(BaseDAO[CartItem]):
 
 class TransactionDAO(BaseDAO[Transaction]):
     model = Transaction
-    def create_transaction(self,
-            user_id: UUID,
-            amount: float,
-            pv_amount: float,
-            transaction_type: TransactionType,
-            product_id: UUID = None,
-            additional_info: dict = None
-    ) -> Transaction:
-        """Creates transaction record"""
-        transaction = TransactionCreate(
-            user_id=user_id,
-            cash_amount=amount,
-            pv_amount=pv_amount,
-            type=transaction_type,
-            product_id=product_id,
-            status=TransactionStatus.COMPLETED,
-            additional_info=additional_info
-        )
-        return self.add(transaction)
 
 class TimeZoneDAO(BaseDAO[TimeZone]):
     model = TimeZone
@@ -78,4 +60,24 @@ class TimeZoneDAO(BaseDAO[TimeZone]):
     def find_by_offset(self, offset: str) -> Optional[TimeZone]:
         """Find a timezone by offset"""
         return self.find_one_or_none({"offset": offset})
-    
+
+class AchievementDAO(BaseDAO[Achievement]):
+    model = Achievement
+
+class UserAchievementDAO(BaseDAO[UserAchievement]):
+    model = UserAchievement
+
+class ChallengeDAO(BaseDAO[Challenge]):
+    model = Challenge
+
+class TeamDAO(BaseDAO[Team]):
+    model = Team
+
+class BonusDAO(BaseDAO[Bonus]):
+    model = Bonus
+
+class UserMLMDAO(BaseDAO[UserMLM]):
+    model = UserMLM
+
+class UserChallengeDAO(BaseDAO[UserChallenge]):
+    model = UserChallenge

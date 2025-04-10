@@ -1,15 +1,17 @@
 from sqlmodel import Session
 
-from app.api.deps import CommittedSessionDep
 from app.core.postgres.dao import TimeZoneDAO, UserDAO
 
-from app.schemas.core_schemas import UserCreate,TimeZoneCreate
+
 
 
 from app.core.postgres.config import settings
-from app.schemas.core_schemas import UserRole, UserStatus
+
 from app.core.security import get_password_hash
-from app.schemas.types import TimeZoneNames
+from app.schemas.localization import TimeZoneCreate
+from app.schemas.types.localization_types import TimeZoneNames
+from app.schemas.types.user_types import UserRole, UserStatus
+from app.schemas.users import UserCreate
 
 
 def init_db(session: Session) -> None:
@@ -50,10 +52,11 @@ def init_db(session: Session) -> None:
             "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
             "address": "123,Admin St,AdminCity",
             "postcode": "ADMIN01",
-            "role": UserRole.ADMIN.value,
-            "status": UserStatus.ACTIVE.value,
+            "role": UserRole.ADMIN,
+            "status": UserStatus.ACTIVE,
             "pv_balance": 0.0,
             "cash_balance": 1000,
+            "mentees_count": 0,
             "timezone": TimeZoneNames.UTC,
             "mentor_id": None
         }

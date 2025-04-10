@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from fastapi import HTTPException, status
 from sqlmodel import desc
 from app.core.postgres.config import settings
-from app.models.core import Product
+from app.models.user import Product
 from app.schemas.core_schemas import PurchaseResponse
 
 
@@ -47,7 +47,7 @@ def test_buy_product_success(client: TestClient, normal_user_token_headers: dict
     product_id = uuid.uuid4()
     mock_response = PurchaseResponse(success=True, message="Purchased")
 
-    with patch("app.api.deps.PurchaseServiceDep.process_purchase", return_value=mock_response):
+    with patch("app.api.dependencies.PurchaseServiceDep.process_purchase", return_value=mock_response):
         response = client.post(
             f"{settings.API_V1_STR}/buyers/purchase",
             headers=normal_user_token_headers,
@@ -66,7 +66,7 @@ def test_buy_product_unauthenticated(client: TestClient):
 
 
 def test_buy_product_service_error(client: TestClient, normal_user_token_headers: dict):
-    with patch("app.api.deps.PurchaseServiceDep.process_purchase", side_effect=HTTPException(400, "Bad request")):
+    with patch("app.api.dependencies.PurchaseServiceDep.process_purchase", side_effect=HTTPException(400, "Bad request")):
         response = client.post(
             f"{settings.API_V1_STR}/buyers/purchase",
             headers=normal_user_token_headers,
@@ -141,7 +141,7 @@ def test_get_purchase_recommendations_with_limit(client: TestClient, normal_user
 # Фикстуры для pytest
 @pytest.fixture
 def mock_redis():
-    with patch("app.api.deps.RedisDep") as mock:
+    with patch("app.api.dependencies.RedisDep") as mock:
         yield mock
 
 

@@ -10,7 +10,7 @@ from app.core.postgres.dao import UserDAO
 from app.core.postgres.db import init_db
 from app.core.postgres.db_engine import engine
 from app.main import app
-from app.models.core import User
+from app.models.user import User
 from app.schemas.core_schemas import UserRegister
 from app.tests.utils.user import authentication_token_from_email
 from app.tests.utils.utils import get_superuser_token_headers

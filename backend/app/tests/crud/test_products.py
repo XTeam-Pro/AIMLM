@@ -3,7 +3,7 @@ from uuid import uuid4
 from decimal import Decimal
 from datetime import datetime
 from app.core.postgres.dao import ProductDAO
-from app.models.core import Product
+from app.models.user import Product
 from app.core.postgres.base import BaseDAO
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

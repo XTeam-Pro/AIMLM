@@ -2,7 +2,7 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 from app.core.postgres.config import settings
-from app.models.core import User, Product, UserProductInteraction, CartItem
+from app.models.user import User, Product, UserProductInteraction, CartItem
 from app.core.security import get_password_hash
 
 

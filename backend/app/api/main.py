@@ -8,7 +8,8 @@ from app.api.routes import (
     utils,
     gamification,
     interaction,
-    buyers
+    buyers,
+    mentors
 )
 from app.core.postgres.config import settings
 
@@ -20,6 +21,6 @@ api_router.include_router(gamification.router)
 api_router.include_router(buyers.router)
 api_router.include_router(interaction.router)
 api_router.include_router(products.router)
-
+api_router.include_router(mentors.router)
 if settings.ENVIRONMENT == "local":
     api_router.include_router(private.router)

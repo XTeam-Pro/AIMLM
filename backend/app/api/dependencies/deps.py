@@ -1,5 +1,5 @@
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -21,8 +21,9 @@ from app.core.postgres.session_handler import (
     get_session_with_commit,
     get_session_without_commit
 )
-from app.models.core import User
+from app.models.user import User
 from app.schemas.core_schemas import TokenPayload
+from app.schemas.types import LeaderboardPeriod
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -78,10 +79,3 @@ def get_current_active_superuser(current_user: CurrentUser) -> User:
         )
     return current_user
 
-
-def get_purchase_service(session: CommittedSessionDep) -> PurchaseService:
-    """Returns PurchaseService instance with current session"""
-    return PurchaseService(session)
-
-
-PurchaseServiceDep = Annotated[PurchaseService, Depends(get_purchase_service)]
