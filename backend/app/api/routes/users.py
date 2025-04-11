@@ -21,7 +21,7 @@ from app.schemas.auth import UpdatePassword
 from app.schemas.common import Message
 from app.schemas.mlm import UserMLMCreate
 from app.schemas.users import UsersPublic, UserPublic, UserCreate, UserUpdateMe, UserRegister, UserUpdate
-
+from app.schemas.users import SignupRequest
 from app.utils import generate_new_account_email, send_email
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -70,7 +70,11 @@ def create_user(
             detail="The user with this email already exists in the system.",
         )
 
-    user = user_dao.add(user_in.model_dump())
+    user_dict = user_in.model_dump()
+    password = user_dict.pop("password")
+    user_dict["hashed_password"] = get_password_hash(password)
+
+    user = user_dao.add(user_dict)
 
     if settings.emails_enabled and user_in.email:
         email_data = generate_new_account_email(
@@ -169,13 +173,12 @@ def delete_user_me(
 
 @router.post("/signup", response_model=UserPublic)
 def register_user(
-        session: CommittedSessionDep,
-        user_in: UserRegister,
-        user_mlm: UserMLMCreate
-) -> Any:
-    """
-    Create new user without the need to be logged in.
-    """
+    session: CommittedSessionDep,
+    signup_data: SignupRequest
+) -> UserPublic:
+    user_in = signup_data.user
+    user_mlm_data = signup_data.mlm
+
     user_dao = UserDAO(session)
     if user_dao.find_one_or_none({"email": user_in.email}):
         raise HTTPException(
@@ -183,20 +186,33 @@ def register_user(
             detail="The user with this email already exists in the system",
         )
 
-    user_create = UserCreate(**user_in.model_dump())
-    user = user_dao.add(user_create)
+    user_dict = user_in.model_dump()
+    password = user_dict.pop("password")
+    user_dict["hashed_password"] = get_password_hash(password)
 
-    # Create a new entry in the UserMLM for new user
+    user = user_dao.add(user_dict) 
+
+    # Now add MLM data manually
     user_mlm_dao = UserMLMDAO(session)
     user_mlm_create = UserMLMCreate(
         user_id=user.id,
-        contract_type=user_mlm.contract_type,
-        current_rank=user_mlm.current_rank,
-        current_club=user_mlm.current_club
+        contract_type=user_mlm_data.contract_type,
+        current_rank=user_mlm_data.current_rank,
+        current_club=user_mlm_data.current_club,
+        personal_volume=user_mlm_data.personal_volume,
+        group_volume=user_mlm_data.group_volume,
+        accumulated_volume=user_mlm_data.accumulated_volume,
+        binary_volume_left=user_mlm_data.binary_volume_left,
+        binary_volume_right=user_mlm_data.binary_volume_right,
+        sponsor_id=user_mlm_data.sponsor_id,
+        placement_sponsor_id=user_mlm_data.placement_sponsor_id,
+        bonuses=[],
+        activities=[],
+        ranks_history=[]
     )
     user_mlm_dao.add(user_mlm_create)
 
-    return user
+    return UserPublic.model_validate(user)
 
 @router.get("/{user_id}", response_model=UserPublic)
 def read_user_by_id(

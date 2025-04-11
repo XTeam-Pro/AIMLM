@@ -53,6 +53,7 @@ def init_db(session: Session) -> None:
             "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
             "address": "123,Admin St,AdminCity",
             "postcode": "ADMIN01",
+            "role":UserRole.ADMIN.value
         }
         user_dao.add(superuser_data)
     session.commit()

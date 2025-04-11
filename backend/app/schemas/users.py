@@ -9,7 +9,7 @@ from decimal import Decimal
 from app.schemas.types.localization_types import TimeZoneNames
 from app.schemas.types.gamification_types import RankType
 from app.schemas.types.user_types import UserRole, UserStatus
-
+from app.schemas.mlm import UserMLMCreate
 
 class UserUpdateMe(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=255)
@@ -21,7 +21,6 @@ class UserBase(BaseModel):
     username: str
     phone: str
     full_name: str
-    mentees_count: int
 
     @field_validator('email')
     def validate_email_rfc(cls, v):
@@ -38,13 +37,11 @@ class UserBase(BaseModel):
 
 
 class UserRegister(UserBase):
-    hashed_password: str
+    password: str
     address: str
     postcode: str
     role: UserRole
     status: UserStatus
-    cash_balance: float
-    pv_balance: float
 
     @field_validator('address')
     def validate_address(cls, v: str) -> str:
@@ -62,7 +59,7 @@ class UserRegister(UserBase):
             raise ValueError("Postcode must contain only letters, numbers, spaces or hyphens")
         return v
 
-    @field_validator('hashed_password')
+    @field_validator('password')
     def validate_password_complexity(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
@@ -84,13 +81,10 @@ class UserRegister(UserBase):
 class UserCreate(UserRegister):
     status: UserStatus
     role: UserRole
-    timezone: TimeZoneNames
-    mentees_count: int
     mentor_id: Optional[uuid.UUID]
-    rank_id: RankType
+    rank: RankType
     team_id: Optional[uuid.UUID]
-    total_personal_sales: Decimal
-    total_team_sales: Decimal
+
 
 
 class UserUpdate(BaseModel):
@@ -114,18 +108,16 @@ class UserPublic(UserBase):
     id: uuid.UUID
     role: UserRole
     status: UserStatus
-    cash_balance: Decimal
-    pv_balance: Decimal
     registration_date: datetime
-    timezone: TimeZoneNames
-    mentees_count: int
-    rank_id: RankType
     team_id: Optional[uuid.UUID]
-    total_personal_sales: Decimal
-    total_team_sales: Decimal
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
 class UsersPublic(BaseModel):
     data: list[UserPublic]
     count: int
+
+
+class SignupRequest(BaseModel):
+    user: UserCreate
+    mlm: UserMLMCreate

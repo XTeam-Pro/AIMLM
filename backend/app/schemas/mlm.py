@@ -21,11 +21,11 @@ class UserMLMBase(BaseModel):
     placement_sponsor_id: Optional[uuid.UUID] = None
 
 class UserMLMCreate(UserMLMBase):
-    user_id: uuid.UUID
-    business_centers: List[uuid.UUID] = []
-    bonuses: List[uuid.UUID] = []
-    activities: List[uuid.UUID] = []
-    ranks_history: List[uuid.UUID] = []
+    user_id: Optional[uuid.UUID] = None
+    #business_centers: List[uuid.UUID] = []
+    #bonuses: List[uuid.UUID] = []
+    #activities: List[uuid.UUID] = []
+    #ranks_history: List[uuid.UUID] = []
 
 class UserMLMUpdate(UserMLMBase):
     contract_type: Optional[str] = None
