@@ -36,7 +36,7 @@ class BonusType(str, Enum):
     ACCUMULATIVE = "accumulative"    # Accumulated volume bonus
     BINARY = "binary"                # Binary structure bonus
     DEVELOPMENT = "development"      # Network development bonus
-    SPONSOR = "sponsor"              # Direct sponsorship bonus
+    SPONSOR = "sponsor"              # Direct disposable sponsorship bonus
     MATCHING = "matching"            # Matching bonus from downline
     LEADERSHIP = "leadership"        # Leadership level achievement
 
@@ -45,3 +45,10 @@ class RankType(str, Enum):
     MIDDLE = "middle"
     SENIOR = "senior"
     LEADER = "leader"
+
+
+class ClubType(str, Enum):
+    PREMIER = "PREMIER CLUB"
+    GOLD = "GOLD CLUB"
+    CRYSTAL = "CRYSTAL CLUB"
+    DIAMOND = "DIAMOND CLUB"

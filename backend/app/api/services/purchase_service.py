@@ -1,22 +1,19 @@
 import uuid
 from decimal import Decimal
-
 from uuid import UUID
 
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from app.api.services.mlm_service import MLMService, SellerShare
+from app.api.services.mlm_service import MLMService
 from app.core.postgres.dao import (
     ProductDAO,
     UserDAO,
-    CartItemDAO,
     TransactionDAO
 )
-from app.schemas.common import (
-    TransactionCreate,
-)
+from app.schemas.common import TransactionCreate
 from app.schemas.types.common_types import TransactionType, TransactionStatus
+
 
 class PurchaseResponse(BaseModel):
     message: str
@@ -25,48 +22,42 @@ class PurchaseResponse(BaseModel):
     seller_pv_balance: Decimal
     transaction_id: uuid.UUID
 
+
 class PurchaseService:
     def __init__(self, session):
         self.session = session
         self._product_dao = ProductDAO(session)
         self._user_dao = UserDAO(session)
-        self._cart_dao = CartItemDAO(session)
         self._transaction_dao = TransactionDAO(session)
         self._mlm_service = MLMService(session)
-        self._company_account_id = UUID("00000000-0000-0000-0000-000000000001")  # company ID
+        self._company_account_id = UUID("00000000-0000-0000-0000-000000000001")
 
-    def process_purchase(self, buyer_id: UUID, product_id: UUID,
-                         seller_id: UUID | None = None) -> PurchaseResponse:
-        """Process purchase with MLM bonuses distribution"""
+    def process_purchase(self, buyer_id: UUID, product_id: UUID, seller_id: UUID | None = None) -> PurchaseResponse:
         product = self._validate_product(product_id)
-        buyer = self._get_user(buyer_id)
+        buyer = self._get_user_with_mlm(buyer_id)
         seller = self._determine_seller(buyer, seller_id)
 
         self._check_user_funds(buyer, product.price)
-
-        # Main transaction
         updated_buyer = self._update_user_balance(buyer.id, -product.price, Decimal(0))
 
-        transaction_type = TransactionType.PURCHASE
+        transaction_type = TransactionType.PRODUCT_PURCHASE
         if seller:
-            seller_share = self._calculate_seller_share(product, is_sponsor=(seller.id == buyer.sponsor_id))
-            updated_seller = self._update_user_balance(
-                seller.id,
-                seller_share.cash_amount,
-                seller_share.pv_amount
+            is_sponsor = (
+                buyer.mlm_data and seller.id == buyer.mlm_data.sponsor_id
             )
-            transaction_type = (
-                    TransactionType.PRODUCT_PURCHASE
-                if seller.id == buyer.sponsor_id
-                else TransactionType.PRODUCT_PURCHASE
-            )
+            if is_sponsor:
+                seller_cash = product.price * Decimal("0.5")
+                seller_pv = product.pv_value
+                company_share = product.price * Decimal("0.2")
+            else:
+                seller_cash = product.price * Decimal("0.3")
+                seller_pv = product.pv_value * Decimal("0.8")
+                company_share = product.price * Decimal("0.2")
 
-            # Part of the sum goes to the company (20%)
-            company_share = product.price * 0.2
+            updated_seller = self._update_user_balance(seller.id, seller_cash, seller_pv)
             self._update_user_balance(self._company_account_id, company_share, Decimal(0))
         else:
             updated_seller = None
-            # All the sum goes to the company when a purchase has no seller
             self._update_user_balance(self._company_account_id, product.price, Decimal(0))
 
         transaction = self._create_transaction(
@@ -76,13 +67,7 @@ class PurchaseService:
             transaction_type=transaction_type
         )
 
-        # Distributing MLM bonuses
-        self._mlm_service.distribute_mlm_bonuses(
-            buyer_id=buyer.id,
-            product_price=product.price,
-            pv_value=product.pv_value,
-            seller_id=seller.id if seller else None
-        )
+        self._mlm_service.on_product_purchase(buyer.id)
 
         return PurchaseResponse(
             message="Purchase successful",
@@ -93,27 +78,11 @@ class PurchaseService:
         )
 
     def _determine_seller(self, buyer, seller_id=None):
-        """Determine seller based on context"""
         if seller_id:
-            return self._get_user(seller_id)
-        elif buyer.sponsor_id:
-            return self._get_user(buyer.sponsor_id)
+            return self._get_user_with_mlm(seller_id)
+        elif buyer.mlm_data and buyer.mlm_data.sponsor_id:
+            return self._get_user_with_mlm(buyer.mlm_data.sponsor_id)
         return None
-
-    def _calculate_seller_share(self, product, is_sponsor):
-        """Calculate seller's share based on relationship"""
-        if is_sponsor:
-            # Sponsor get 50% of the total sum (30% goes to MLM bonuses, 20% goes to the company)
-            return SellerShare(
-                cash_amount=product.price * 0.5,
-                pv_amount=product.pv_value
-            )
-        else:
-            # A casual seller gets 30% (50% goes to MLM bonuses, 20% goes to the company)
-            return SellerShare(
-                cash_amount=product.price * 0.3,
-                pv_amount=product.pv_value * 0.8
-            )
 
     def _validate_product(self, product_id: UUID):
         product = self._product_dao.find_one_or_none_by_id(product_id)
@@ -121,7 +90,7 @@ class PurchaseService:
             raise HTTPException(status_code=409, detail="Product not available for purchase")
         return product
 
-    def _get_user(self, user_id: UUID):
+    def _get_user_with_mlm(self, user_id: UUID):
         user = self._user_dao.find_one_or_none_by_id(user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")

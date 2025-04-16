@@ -23,7 +23,6 @@ def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    logger.info(f"dao plain password {plain_password}  user hashed {hashed_password}")
     return pwd_context.verify(plain_password, hashed_password)
 
 

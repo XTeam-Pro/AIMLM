@@ -75,8 +75,6 @@ class PurchaseItem(SQLModel, table=True):
     product: "Product" = Relationship()
 
     # Optionally, you can add extra fields like 'total_price' for better readability if necessary
-    total_price: Decimal = Field(default=None, max_digits=12, decimal_places=2)
-
     # Logic to automatically calculate total price
     @property
     def total_price(self):

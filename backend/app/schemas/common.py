@@ -37,6 +37,8 @@ class ProductCreate(ProductBase):
     is_collection: bool
     collection_items: Optional[List[Dict[str, Any]]]
 
+class ProductsCreate(BaseModel):
+    products: List[ProductCreate]
 
 class ProductUpdate(BaseModel):
     title: Optional[str]
@@ -69,7 +71,6 @@ class TransactionBase(BaseModel):
 class TransactionCreate(TransactionBase):
     product_id: Optional[uuid.UUID]
     status: TransactionStatus
-    achievement_id: Optional[uuid.UUID]
     buyer_id: uuid.UUID
     seller_id: uuid.UUID
 
@@ -87,7 +88,6 @@ class TransactionPublic(TransactionBase):
     created_at: datetime
     user_id: uuid.UUID
     product_id: Optional[uuid.UUID]
-    achievement_id: Optional[uuid.UUID]
     model_config = ConfigDict(from_attributes=True)
 
 class UserProductInteractionBase(BaseModel):

@@ -1,43 +1,47 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 
-from app.schemas.types.gamification_types import BonusType
+from sqlmodel import Field
+
+from app.schemas.types.common_types import ContractType, MLMRankType
+from app.schemas.types.gamification_types import BonusType, ClubType
 
 
 # Models:
 class UserMLMBase(BaseModel):
-    contract_type: str
-    current_rank: str
-    current_club: str
+    contract_type: ContractType = Field(default=ContractType.BASIC)
+    current_rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
+    current_club: ClubType = Field(default=ClubType.PREMIER)
     personal_volume: Decimal = Field(default=Decimal(0))
     group_volume: Decimal = Field(default=Decimal(0))
     accumulated_volume: Decimal = Field(default=Decimal(0))
     binary_volume_left: Decimal = Field(default=Decimal(0))
     binary_volume_right: Decimal = Field(default=Decimal(0))
-    sponsor_id: Optional[uuid.UUID] = None
-    placement_sponsor_id: Optional[uuid.UUID] = None
+    sponsor_id: Optional[uuid.UUID] = Field(...,)
+    mentor_id: Optional[uuid.UUID] = None
+    placement_sponsor_id: Optional[uuid.UUID] = Field(default=None)
 
-class UserMLMCreate(UserMLMBase):
-    user_id: Optional[uuid.UUID] = None
-    #business_centers: List[uuid.UUID] = []
-    #bonuses: List[uuid.UUID] = []
-    #activities: List[uuid.UUID] = []
-    #ranks_history: List[uuid.UUID] = []
+class UserMLMInput(UserMLMBase):
+    model_config = ConfigDict(from_attributes=True)
 
-class UserMLMUpdate(UserMLMBase):
-    contract_type: Optional[str] = None
-    current_rank: Optional[str] = None
-    current_club: Optional[str] = None
+class UserMLMCreate(UserMLMInput):
+    user_id: uuid.UUID = Field(...,)
+
+class UserMLMUpdate(BaseModel):
+    contract_type: Optional[ContractType] = None
+    current_rank: Optional[MLMRankType] = None
+    current_club: Optional[ClubType] = None
     personal_volume: Optional[Decimal] = None
     group_volume: Optional[Decimal] = None
     accumulated_volume: Optional[Decimal] = None
     binary_volume_left: Optional[Decimal] = None
     binary_volume_right: Optional[Decimal] = None
-    sponsor_id: Optional[uuid.UUID] = None
-    placement_sponsor_id: Optional[uuid.UUID] = None
+    placement_sponsor_id: uuid.UUID | None = Field(default=None)
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BusinessCenterBase(BaseModel):

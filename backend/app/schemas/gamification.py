@@ -3,6 +3,8 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 from datetime import datetime, timezone
+
+from app.schemas.types.common_types import MLMRankType
 from app.schemas.types.gamification_types import ChallengeType, RankType
 from app.schemas.users import UserPublic
 
@@ -13,7 +15,7 @@ class AchievementBase(BaseModel):
     tier: str
     points_required: Decimal
     is_secret: bool
-    rank_requirement_id: Optional[uuid.UUID]
+    rank: Optional[MLMRankType] = Field(default=None)
 
 
 class AchievementCreate(AchievementBase):
@@ -26,7 +28,7 @@ class AchievementUpdate(BaseModel):
     tier: Optional[str]
     points_required: Optional[Decimal]
     is_secret: Optional[bool]
-    rank_requirement_id: Optional[uuid.UUID]
+    #rank_requirement: MLMRankType = Field(default=MLMRankType.NEWBIE)
 
 
 class AchievementPublic(AchievementBase):
@@ -67,13 +69,13 @@ class UserAchievementPublic(UserAchievementBase):
 class ChallengeBase(BaseModel):
     name: str
     description: str
-    challenge_type: ChallengeType
+    challenge_type: ChallengeType = Field(default=ChallengeType.PERSONAL)
     start_date: datetime
     end_date: datetime
-    reward_type: str
+    reward_type: str # PV, product, rank_boost
     reward_value: Decimal
-    min_rank: Optional[uuid.UUID]
-    is_active: bool
+    min_rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
+    is_active: bool = Field(default=True) # switch off the challenge temporarily
     created_by: uuid.UUID
 
 
@@ -95,7 +97,6 @@ class ChallengeUpdate(BaseModel):
 
 class ChallengePublic(ChallengeBase):
     id: uuid.UUID
-    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -144,30 +145,3 @@ class UserRankUpdate(BaseModel):
     min_pv: Optional[Decimal]
     min_team_pv: Optional[Decimal]
     min_mentees: Optional[int]
-
-
-class TeamBase(BaseModel):
-    name: str
-    description: str
-    level: int = Field(default=1)
-    total_pv: Decimal = Field(default=Decimal(0))
-    total_sales: Decimal = Field(default=Decimal(0))
-    is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    model_config = ConfigDict(from_attributes=True)  # Allows for automatic handling of ORM data
-
-# Schema for creating a new team
-class TeamCreate(TeamBase):
-    pass  # In this case, the creation schema is the same as the base schema
-
-# Schema for returning team information (public)
-class TeamPublic(TeamBase):
-    id: uuid.UUID
-    captain_id: uuid.UUID
-    captain: UserPublic
-    members: list[UserPublic] = []  # List of team members, using `UserPublic`
-    challenges: list[ChallengeParticipantPublic] = []
-
-    model_config = ConfigDict(from_attributes=True)

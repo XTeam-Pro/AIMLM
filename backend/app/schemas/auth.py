@@ -46,3 +46,13 @@ class PasswordReset(BaseModel):
 class UpdatePassword(BaseModel):
     current_password: str
     new_password: str
+
+    @field_validator('current_password', 'new_password')
+    def validate_password_complexity(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v

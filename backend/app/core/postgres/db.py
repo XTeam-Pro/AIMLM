@@ -1,59 +1,84 @@
+from datetime import datetime, timezone
+from uuid import uuid4
+
 from sqlmodel import Session
 
-from app.core.postgres.dao import TimeZoneDAO, UserDAO
-
-
-from app.schemas.types.gamification_types import RankType
+from app.core.postgres.dao import TimeZoneDAO, UserDAO, UserMLMDAO
 
 from app.core.postgres.config import settings
 
 from app.core.security import get_password_hash
 from app.schemas.localization import TimeZoneCreate
-from app.schemas.types.localization_types import TimeZoneNames
+from app.schemas.types.common_types import MLMRankType, ContractType
+from app.schemas.types.gamification_types import RankType, ClubType
+from app.schemas.types.localization_types import TimeZoneNames, CountryEnum
 from app.schemas.types.user_types import UserRole, UserStatus
-from app.schemas.users import UserCreate
-
 
 def init_db(session: Session) -> None:
     """
-    Initialize the database with default timezones and superuser
-     """
-    timezone_dao = TimeZoneDAO(session)
-    timezones = [
-        {"name": TimeZoneNames.UTC, "offset": "+00:00"},
-        {"name": TimeZoneNames.GMT, "offset": "+00:00"},
-        {"name": TimeZoneNames.EST, "offset": "-05:00"},
-        {"name": TimeZoneNames.EDT, "offset": "-04:00"},
-        {"name": TimeZoneNames.CST, "offset": "-06:00"},
-        {"name": TimeZoneNames.CDT, "offset": "-05:00"},
-        {"name": TimeZoneNames.PST, "offset": "-08:00"},
-        {"name": TimeZoneNames.PDT, "offset": "-07:00"},
-        {"name": TimeZoneNames.AEST, "offset": "+10:00"},
-        {"name": TimeZoneNames.AEDT, "offset": "+11:00"},
-        {"name": TimeZoneNames.BST, "offset": "+01:00"},
-        {"name": TimeZoneNames.CET, "offset": "+01:00"},
-        {"name": TimeZoneNames.CEST, "offset": "+02:00"},
-        {"name": TimeZoneNames.IST, "offset": "+05:30"},
-        {"name": TimeZoneNames.JST, "offset": "+09:00"},
-    ]
-    for timezone_data in timezones:
-    # Convert dict to Pydantic model instance before passing to DAO
-        timezone_model = TimeZoneCreate(**timezone_data)
-        if not timezone_dao.find_one_or_none({"name": timezone_model.name}):
-            timezone_dao.add(timezone_model)
-    session.commit()
+    Initialize the database with a default sponsor and superuser.
+    """
     user_dao = UserDAO(session)
-    user = user_dao.find_one_or_none({"email": settings.FIRST_SUPERUSER})
-    if not user:
-        superuser_data = {
-            "email": settings.FIRST_SUPERUSER,
-            "username": "administrator",
-            "phone": "+1234567890",
-            "full_name": "Super User",
-            "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
-            "address": "123,Admin St,AdminCity",
-            "postcode": "ADMIN01",
-            "role":UserRole.ADMIN.value
-        }
-        user_dao.add(superuser_data)
+    mlm_dao = UserMLMDAO(session)
+
+    # Check if superuser already exists
+    existing_superuser = user_dao.find_one_or_none({"email": settings.FIRST_SUPERUSER})
+    if existing_superuser:
+        return  # Already initialized
+
+    # Create fake sponsor user (as upline reference)
+    sponsor_data = {
+        "email": "sponsor@google.com",
+        "username": "sponsor_user",
+        "phone": "+11111111111",
+        "full_name": "Fake Sponsor",
+        "country": CountryEnum.AUSTRALIA,
+        "hashed_password": get_password_hash("String123"),
+        "rank": MLMRankType.NEWBIE,
+        "role": UserRole.DISTRIBUTOR,
+        "status": UserStatus.ACTIVE,
+        "registration_date": datetime.now(timezone.utc),
+        "address": "Some Address",
+        "postcode": "123456",
+        "referral_code": uuid4().hex[:8]
+    }
+
+    sponsor = user_dao.add(sponsor_data)
+
+    # Create actual superuser
+    superuser_data = {
+        "email": settings.FIRST_SUPERUSER,
+        "username": "aleksandr",
+        "phone": "+12345678901",
+        "full_name": "Super Admin",
+        "country": CountryEnum.USA,
+        "hashed_password": get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+        "address": "123 Main St, New York",
+        "referral_code": uuid4().hex[:8],
+        "postcode": "10001",
+        "role": UserRole.ADMIN,
+        "status": UserStatus.ACTIVE,
+        "rank": MLMRankType.GOLD,
+        "registration_date": datetime.now(timezone.utc),
+    }
+
+    superuser = user_dao.add(superuser_data)
+
+    # Create MLM data for superuser
+    mlm_data = {
+        "user_id": superuser.id,
+        "contract_type": ContractType.BASIC,
+        "current_rank": MLMRankType.NEWBIE,
+        "current_club": ClubType.PREMIER,
+        "personal_volume": 0,
+        "group_volume": 0,
+        "accumulated_volume": 0,
+        "binary_volume_left": 0,
+        "binary_volume_right": 0,
+        "sponsor_id": sponsor.id,
+        "placement_sponsor_id": None,
+        "mentor_id": None
+    }
+
+    mlm_dao.add(mlm_data)
     session.commit()

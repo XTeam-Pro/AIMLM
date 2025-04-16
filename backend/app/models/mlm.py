@@ -30,7 +30,14 @@ class UserMLM(SQLModel, table=True):
         back_populates="mlm_data",
         sa_relationship_kwargs={"foreign_keys": "[UserMLM.user_id]"}
     )
-
+    mentor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
+    mentor: Optional["User"] = Relationship(
+        back_populates="mentees",
+        sa_relationship_kwargs={
+            "foreign_keys": "[UserMLM.mentor_id]",
+            "remote_side": "User.id"
+        }
+    )
     business_centers: list["BusinessCenter"] = Relationship(back_populates="owner")
     bonuses: list["Bonus"] = Relationship(back_populates="user")
     activities: list["UserActivity"] = Relationship(back_populates="user")
@@ -39,6 +46,8 @@ class UserMLM(SQLModel, table=True):
 class BusinessCenter(SQLModel, table=True):
     __tablename__ = "business_centers"
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    parent_center_id: Optional[uuid.UUID] = Field(foreign_key="business_centers.id", default=None)
+    position_in_parent: Optional[str] = Field(default=None)
     owner_id: uuid.UUID = Field(foreign_key="user_mlm.id")
     center_number: int = Field(..., ge=1, le=4)
     left_volume: Decimal = Field(default=Decimal(0))

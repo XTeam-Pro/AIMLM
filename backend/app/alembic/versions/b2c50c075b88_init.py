@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 61c9a38b7179
+Revision ID: b2c50c075b88
 Revises: 
-Create Date: 2025-04-10 15:54:55.349735
+Create Date: 2025-04-16 12:19:26.019049
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = '61c9a38b7179'
+revision = 'b2c50c075b88'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,19 +26,7 @@ def upgrade():
     sa.Column('tier', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('points_required', sa.Numeric(), nullable=False),
     sa.Column('is_secret', sa.Boolean(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('challenge_teams',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('captain_id', sa.Uuid(), nullable=False),
-    sa.Column('level', sa.Integer(), nullable=False),
-    sa.Column('total_pv', sa.Numeric(), nullable=False),
-    sa.Column('total_sales', sa.Numeric(), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('rank', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('generation_bonus_matrix',
@@ -64,9 +52,11 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('time_zones',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('country', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('offset', sqlmodel.sql.sqltypes.AutoString(length=6), nullable=False),
-    sa.PrimaryKeyConstraint('name')
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('users',
     sa.Column('id', sa.Uuid(), nullable=False),
@@ -82,8 +72,6 @@ def upgrade():
     sa.Column('registration_date', sa.DateTime(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('rank', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('mentor_id', sa.Uuid(), nullable=True),
-    sa.Column('team_id', sa.Uuid(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -106,8 +94,10 @@ def upgrade():
     sa.Column('end_date', sa.DateTime(), nullable=False),
     sa.Column('reward_type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('reward_value', sa.Numeric(), nullable=False),
+    sa.Column('min_rank', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_by', sa.Uuid(), nullable=False),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('transactions',
@@ -122,6 +112,10 @@ def upgrade():
     sa.Column('achievement_id', sa.Uuid(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('additional_info', sa.JSON(), nullable=True),
+    sa.ForeignKeyConstraint(['achievement_id'], ['achievements.id'], ),
+    sa.ForeignKeyConstraint(['buyer_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_achievements',
@@ -140,6 +134,8 @@ def upgrade():
     sa.Column('ancestor_id', sa.Uuid(), nullable=False),
     sa.Column('descendant_id', sa.Uuid(), nullable=False),
     sa.Column('level', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['ancestor_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['descendant_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_mlm',
@@ -155,6 +151,11 @@ def upgrade():
     sa.Column('binary_volume_right', sa.Numeric(), nullable=False),
     sa.Column('sponsor_id', sa.Uuid(), nullable=True),
     sa.Column('placement_sponsor_id', sa.Uuid(), nullable=True),
+    sa.Column('mentor_id', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['mentor_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['placement_sponsor_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['sponsor_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
     )
@@ -186,25 +187,26 @@ def upgrade():
     )
     op.create_table('business_centers',
     sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('parent_center_id', sa.Uuid(), nullable=True),
+    sa.Column('position_in_parent', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('owner_id', sa.Uuid(), nullable=False),
     sa.Column('center_number', sa.Integer(), nullable=False),
     sa.Column('left_volume', sa.Numeric(), nullable=False),
     sa.Column('right_volume', sa.Numeric(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['owner_id'], ['user_mlm.id'], ),
+    sa.ForeignKeyConstraint(['parent_center_id'], ['business_centers.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('challenge_participants',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('challenge_id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=True),
-    sa.Column('team_id', sa.Uuid(), nullable=True),
     sa.Column('current_progress', sa.Numeric(), nullable=False),
     sa.Column('is_completed', sa.Boolean(), nullable=False),
     sa.Column('completed_at', sa.DateTime(), nullable=True),
     sa.Column('reward_issued', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['challenge_id'], ['challenges.id'], ),
-    sa.ForeignKeyConstraint(['team_id'], ['challenge_teams.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -219,6 +221,9 @@ def upgrade():
     sa.Column('is_client_purchase', sa.Boolean(), nullable=False),
     sa.Column('client_id', sa.Uuid(), nullable=True),
     sa.Column('transaction_id', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['transaction_id'], ['transactions.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_activities',
@@ -230,6 +235,7 @@ def upgrade():
     sa.Column('personal_volume', sa.Numeric(), nullable=False),
     sa.Column('is_confirmed', sa.Boolean(), nullable=False),
     sa.Column('confirmed_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['user_mlm.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_rank_history',
@@ -241,6 +247,7 @@ def upgrade():
     sa.Column('qualification_period', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('group_volume', sa.Numeric(), nullable=False),
     sa.Column('personal_volume', sa.Numeric(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['user_mlm.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('purchase_items',
@@ -250,47 +257,11 @@ def upgrade():
     sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('unit_price', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('pv_value', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('total_price', sa.Numeric(), nullable=False),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.ForeignKeyConstraint(['purchase_id'], ['purchases.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_foreign_key('fk_users_mentor_id', 'users', 'users', ['mentor_id'], ['id'])
-    op.create_foreign_key('fk_users_team_id', 'users', 'challenge_teams', ['team_id'], ['id'])
-
-    # Create foreign keys for the challenge_teams table
-    op.create_foreign_key('fk_challenge_teams_captain_id', 'challenge_teams', 'users', ['captain_id'], ['id'])
-
-    # Create foreign key for the purchases table
-    op.create_foreign_key('fk_purchase_user_id', 'purchases', 'users', ['user_id'], ['id'])
-    op.create_foreign_key('fk_purchase_client_id', 'purchases', 'users', ['client_id'], ['id'])
-    op.create_foreign_key('fk_purchase_transaction_id', 'purchases', 'transactions', ['transaction_id'], ['id'])
-
-    # Create foreign keys for purchase_items table
-    op.create_foreign_key('fk_purchase_item_purchase_id', 'purchase_items', 'purchases', ['purchase_id'], ['id'])
-    op.create_foreign_key('fk_purchase_item_product_id', 'purchase_items', 'products', ['product_id'], ['id'])
-
-    # Create foreign keys for transactions table
-    op.create_foreign_key('fk_transaction_achievement_id', 'transactions', 'achievements', ['achievement_id'], ['id'])
-    op.create_foreign_key('fk_transaction_buyer_id', 'transactions', 'users', ['buyer_id'], ['id'])
-    op.create_foreign_key('fk_transaction_product_id', 'transactions', 'products', ['product_id'], ['id'])
-    op.create_foreign_key('fk_transaction_seller_id', 'transactions', 'users', ['seller_id'], ['id'])
-
-    # Create foreign keys for user_achievements table
-    op.create_foreign_key('fk_user_achievement_user_id', 'user_achievements', 'users', ['user_id'], ['id'])
-    op.create_foreign_key('fk_user_achievement_achievement_id', 'user_achievements', 'achievements', ['achievement_id'], ['id'])
-
-    # Create foreign keys for user_mlm table
-    op.create_foreign_key('fk_user_mlm_user_id', 'user_mlm', 'users', ['user_id'], ['id'])
-    op.create_foreign_key('fk_user_mlm_placement_sponsor_id', 'user_mlm', 'users', ['placement_sponsor_id'], ['id'])
-    op.create_foreign_key('fk_user_mlm_sponsor_id', 'user_mlm', 'users', ['sponsor_id'], ['id'])
-
-    # Create foreign keys for user_hierarchy table
-    op.create_foreign_key('fk_user_hierarchy_ancestor_id', 'user_hierarchy', 'users', ['ancestor_id'], ['id'])
-    op.create_foreign_key('fk_user_hierarchy_descendant_id', 'user_hierarchy', 'users', ['descendant_id'], ['id'])
-
-    # Create foreign keys for challenge_participants table
-    op.create_foreign_key('fk_challenge_participant_challenge_id', 'challenge_participants', 'challenges', ['challenge_id'], ['id'])
-    op.create_foreign_key('fk_challenge_participant_team_id', 'challenge_participants', 'challenge_teams', ['team_id'], ['id'])
-    op.create_foreign_key('fk_challenge_participant_user_id', 'challenge_participants', 'users', ['user_id'], ['id'])
+    # ### end Alembic commands ###
 
 
 def downgrade():
@@ -314,6 +285,5 @@ def downgrade():
     op.drop_table('time_zones')
     op.drop_table('products')
     op.drop_table('generation_bonus_matrix')
-    op.drop_table('challenge_teams')
     op.drop_table('achievements')
     # ### end Alembic commands ###

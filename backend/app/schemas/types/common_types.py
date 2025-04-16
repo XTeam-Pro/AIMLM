@@ -38,14 +38,6 @@ class MLMRankType(str, Enum):
 # Other ranks for gamification
 
 
-class ClubType(str, Enum):
-    PREMIER = "PREMIER CLUB"
-    GOLD = "GOLD CLUB"
-    CRYSTAL = "CRYSTAL CLUB"
-    DIAMOND = "DIAMOND CLUB"
-
-
-
 class ProductCategory(str, Enum):
     COSMETICS = "cosmetics"
     NUTRITION = "nutrition"
@@ -62,30 +54,17 @@ class InteractionType(str, Enum):
 
 
 class TransactionType(str, Enum):
-    """Main transaction types in MLM system"""
-    # Product transactions
+    """Actual financial transactions in the MLM system."""
+
     PRODUCT_PURCHASE = "product_purchase"
-    SERVICE_PURCHASE = "service_purchase"
+    NETWORK_SALE = "network_sale"
 
-    # Sales types
-    RETAIL_SALE = "retail_sale"  # Sale to non-member
-    NETWORK_SALE = "network_sale"  # Sale within MLM network
-
-    # Financial operations
+    # Finances
     CASH_WITHDRAWAL = "cash_withdrawal"
     CASH_DEPOSIT = "cash_deposit"
     BALANCE_TRANSFER = "balance_transfer"
 
-    # Membership operations
-    REGISTRATION = "registration"
-    STATUS_UPGRADE = "status_upgrade"
-
-    # System operations
+    # System retention
     SYSTEM_FEE = "system_fee"
-    PENALTY = "penalty"
-    COMPENSATION = "compensation"
-
-    # Bonus transactions (uses BonusType for details)
-    BONUS = "bonus"
 
 

@@ -4,10 +4,12 @@ from uuid import UUID
 
 from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
-from app.models.mlm import UserMLM, Bonus
-from app.models.user import User, Product, UserProductInteraction, Transaction,TimeZone
-from app.models.gamification import Achievement, UserAchievement, Challenge, Team, UserChallenge
-from app.models.common  import CartItem
+from app.models.mlm import UserMLM, Bonus, UserHierarchy, BusinessCenter, GenerationBonusMatrix, UserActivity, \
+    UserRankHistory
+from app.models.user import User, UserProductInteraction, Transaction,TimeZone
+from app.models.gamification import Achievement, UserAchievement, Challenge, UserChallenge
+from app.models.common import CartItem, Product, Purchase
+
 
 class UserDAO(BaseDAO[User]):
     model = User
@@ -53,14 +55,6 @@ class TransactionDAO(BaseDAO[Transaction]):
 class TimeZoneDAO(BaseDAO[TimeZone]):
     model = TimeZone
 
-    def find_by_name(self, name: str) -> Optional[TimeZone]:
-        """Find a timezone by name"""
-        return self.find_one_or_none({"name": name})
-
-    def find_by_offset(self, offset: str) -> Optional[TimeZone]:
-        """Find a timezone by offset"""
-        return self.find_one_or_none({"offset": offset})
-
 class AchievementDAO(BaseDAO[Achievement]):
     model = Achievement
 
@@ -70,14 +64,29 @@ class UserAchievementDAO(BaseDAO[UserAchievement]):
 class ChallengeDAO(BaseDAO[Challenge]):
     model = Challenge
 
-class TeamDAO(BaseDAO[Team]):
-    model = Team
-
 class BonusDAO(BaseDAO[Bonus]):
     model = Bonus
 
 class UserMLMDAO(BaseDAO[UserMLM]):
     model = UserMLM
 
+class PurchaseDAO(BaseDAO[Purchase]):
+    model = Purchase
+
 class UserChallengeDAO(BaseDAO[UserChallenge]):
     model = UserChallenge
+
+class UserRankHistoryDAO(BaseDAO[UserRankHistory]):
+    model = UserRankHistory
+
+class UserHierarchyDAO(BaseDAO[UserHierarchy]):
+    model = UserHierarchy
+
+class BusinessCenterDAO(BaseDAO[BusinessCenter]):
+    model = BusinessCenter
+
+class UserActivityDAO(BaseDAO[UserActivity]):
+    model = UserActivity
+
+class GenerationBonusMatrixDAO(BaseDAO[GenerationBonusMatrix]):
+    model = GenerationBonusMatrix

@@ -11,14 +11,14 @@ from app.core.postgres.dao import (
     UserProductInteractionDAO,
     CartItemDAO, TransactionDAO,
 )
-from app.schemas.common import UserProductInteractionCreate, CartItemCreate
+from app.schemas.common import UserProductInteractionCreate, CartItemCreate, TransactionPublic
 from app.schemas.types.common_types import InteractionType, TransactionType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["Interaction"], prefix="/interaction")
+router = APIRouter(tags=["interaction"], prefix="/interaction")
 
-@router.get("/get_purchased")
+@router.get("/get_purchased", response_model=list[TransactionPublic])
 def get_my_products(
     session: UncommittedSessionDep,
     current_user: CurrentUser,
@@ -26,17 +26,24 @@ def get_my_products(
     limit: int = 100
 ):
     """
-    Returns all products info a user has bought
+    Returns all product purchase transactions for the current user.
     """
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required"
         )
-    return TransactionDAO(session).find_all(
-        skip=skip, limit=limit, filters={"user_id": current_user.id, "transaction_type": TransactionType.PRODUCT_PURCHASE}
+
+    transactions = TransactionDAO(session).find_all(
+        skip=skip,
+        limit=limit,
+        filters={
+            "buyer_id": current_user.id,
+            "type": TransactionType.PRODUCT_PURCHASE
+        }
     )
 
+    return [TransactionPublic.model_validate(t) for t in transactions]
 @router.post("/track_view", status_code=status.HTTP_201_CREATED)
 def track_product_view(
         session: CommittedSessionDep,

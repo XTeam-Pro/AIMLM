@@ -9,7 +9,7 @@ from app.api.services.mlm_service import MLMService
 from app.core.postgres.dao import (
     ProductDAO,
     UserDAO,
-    TransactionDAO,
+    TransactionDAO, BonusDAO,
 )
 from app.schemas.common import (
     TransactionCreate,
@@ -52,7 +52,7 @@ class SaleService:
         self._check_buyer_funds(buyer, product.price)
 
         is_sponsor_sale = buyer.sponsor_id == seller_id
-        transaction_type = self._determine_transaction_type(is_sponsor_sale)
+
 
         # Update balances
         seller_balances = self._update_balances(
@@ -67,7 +67,7 @@ class SaleService:
             seller_id=seller_id,
             buyer_id=buyer_id,
             product=product,
-            transaction_type=transaction_type
+            transaction_type=TransactionType.NETWORK_SALE
         )
 
         # Distribute MLM bonuses
@@ -81,11 +81,9 @@ class SaleService:
             pv_amount=product.pv_value,
             new_cash_balance=seller_balances.cash,
             new_pv_balance=seller_balances.pv,
-            transaction_type=transaction_type
+            transaction_type=TransactionType.NETWORK_SALE,
         )
 
-    def _determine_transaction_type(self, is_sponsor_sale: bool) -> TransactionType:
-        return TransactionType.NETWORK_SALE if is_sponsor_sale else TransactionType.RETAIL_SALE
 
     def _update_balances(self, seller_id: UUID, buyer_id: UUID, product, is_sponsor_sale: bool):
         """Update all relevant balances with MLM logic"""

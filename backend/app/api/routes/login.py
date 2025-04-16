@@ -5,8 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app import crud
-from app.api.dependencies.deps import CurrentUser, get_current_active_superuser, UncommittedSessionDep, CommittedSessionDep
+from app.api.dependencies.deps import CurrentUser, get_current_active_superuser,CommittedSessionDep
 from app.core import security
 from app.core.postgres.config import settings
 from app.core.postgres.dao import UserDAO
@@ -37,7 +36,7 @@ router = APIRouter(tags=["login"])
 
 @router.post("/login/access-token")
 def login_access_token(
-        session: UncommittedSessionDep,
+        session: CommittedSessionDep,
         form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ) -> Token:
     """
@@ -66,7 +65,7 @@ def login_access_token(
             user.id,
             expires_delta=access_token_expires
         ),
-        token_type="JWT"
+        token_type="bearer"
     )
 
 @router.post("/login/test-token", response_model=UserPublic)
@@ -109,7 +108,7 @@ def reset_password(session: CommittedSessionDep, body: NewPassword) -> Message:
     email = verify_password_reset_token(token=body.token)
     if not email:
         raise HTTPException(status_code=400, detail="Invalid token")
-    user = crud.get_user_by_email(session=session, email=email)
+    user = UserDAO(session).find_one_or_none({"email": email})
     if not user:
         raise HTTPException(
             status_code=404,

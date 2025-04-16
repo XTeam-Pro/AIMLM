@@ -1,15 +1,17 @@
+import logging
 from typing import  Any
 from uuid import UUID
 from fastapi import APIRouter, HTTPException
-from pydantic import HttpUrl, BaseModel
+from pydantic import BaseModel
 from starlette import status
 
 from app.api.dependencies.deps import CurrentUser, CommittedSessionDep, UncommittedSessionDep
 from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO
-from app.schemas.common import ProductPublic, ProductCreate, ProductUpdate, Message
+from app.schemas.common import ProductPublic, ProductCreate, ProductUpdate, Message, ProductsCreate
 
 router = APIRouter(prefix="/product", tags=["products"])
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 @router.get("/categories")
 def get_all_categories(
@@ -62,7 +64,7 @@ def read_product(
     return product
 
 
-@router.post("/", response_model=ProductPublic, status_code=201)
+@router.post("/", response_model=ProductPublic)
 def create_product(
         session: CommittedSessionDep,
         current_user: CurrentUser,
@@ -76,6 +78,29 @@ def create_product(
 
     return ProductDAO(session).add(product_in)
 
+@router.post("/bulk", response_model=dict)
+def insert_multiple_products(
+        session: CommittedSessionDep,
+        current_user: CurrentUser,
+        products_in: ProductsCreate):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
+    dao = ProductDAO(session)
+    try:
+        created = dao.add_many(products_in.products)
+        return {
+            "message": f"{len(created)} products created successfully",
+            "items": [t.model_dump() for t in created]
+        }
+    except Exception as e:
+        logger.error("Failed to insert multiple products:", e)
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to insert products"
+        )
 
 @router.put("/{product_id}", response_model=ProductPublic)
 def update_product(
@@ -115,7 +140,7 @@ def delete_product(
     return Message(message="Product deleted successfully")
 
 class WebinarCreate(BaseModel):
-    webinar_link: HttpUrl
+    webinar_link: str
 
 @router.post("/{product_id}/webinar", response_model=ProductPublic, status_code=201)
 def create_product_webinar(
@@ -127,20 +152,16 @@ def create_product_webinar(
 ) -> Any:
     """
     Create a webinar for a product.
-    Webinar creation is allowed for mentors or validated distributors.
+    Webinar creation is allowed for mentors or validated users only.
     """
     # Check if the current user is allowed to create webinars.
-    if current_user.role == "mentor":
+    allowed = False
+    if current_user.role == "mentor" or is_validated:
         allowed = True
-    elif current_user.role == "distributor" and is_validated:
-        allowed = True
-    else:
-        allowed = False
-
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only mentors or validated distributors can create webinars"
+            detail="Only mentors or validated users can create webinars"
         )
     product_dao = ProductDAO(session)
     product = product_dao.find_one_or_none_by_id(product_id)

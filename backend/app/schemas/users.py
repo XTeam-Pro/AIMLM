@@ -4,23 +4,17 @@ from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 from typing import Optional
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
-from app.schemas.types.localization_types import TimeZoneNames
-from app.schemas.types.gamification_types import RankType
+from app.schemas.types.common_types import MLMRankType
+from app.schemas.types.localization_types import  CountryEnum
+
 from app.schemas.types.user_types import UserRole, UserStatus
-from app.schemas.mlm import UserMLMCreate
+from app.schemas.mlm import  UserMLMInput
+
 
 class UserUpdateMe(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=255)
     email: Optional[EmailStr] = Field(default=None, max_length=255)
-
-# Models:
-class UserBase(BaseModel):
-    email: str | EmailStr
-    username: str
-    phone: str
-    full_name: str
 
     @field_validator('email')
     def validate_email_rfc(cls, v):
@@ -36,12 +30,59 @@ class UserBase(BaseModel):
             raise ValueError(str(e))
 
 
+class UserBase(BaseModel):
+    email: str | EmailStr
+    username: str
+    phone: str
+    full_name: str
+    country: CountryEnum = None
+    @field_validator('email')
+    def validate_email_rfc(cls, v):
+        try:
+            result = validate_email(v, check_deliverability=False)
+            if v.lower() != "admin@example.com":
+                blocked_domains = {'tempmail.com', 'example.com'}
+                domain = v.split('@')[-1]
+                if domain in blocked_domains:
+                    raise ValueError('Disposable emails are not allowed')
+            return result.normalized
+        except EmailNotValidError as e:
+            raise ValueError(str(e))
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TestSponsorCreate(UserBase):
+    email: EmailStr = Field(examples=["sponsor@google.com"])
+    username: str = Field(max_length=100)
+    phone: str = Field(max_length=20)
+    full_name: str = Field(max_length=255)
+    password: str = Field(min_length=8)
+    rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
+    country: CountryEnum = None
+    role: UserRole = Field(default=UserRole.DISTRIBUTOR)
+    registration_date: datetime = Field(default=lambda: datetime.now())
+    address: str
+    postcode: str
+
+    @field_validator('password')
+    def validate_password_complexity(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
 class UserRegister(UserBase):
     password: str
     address: str
+    referral_code: Optional[str] = Field(default=None, max_length=12)
     postcode: str
-    role: UserRole
-    status: UserStatus
+    role: UserRole = Field(default=UserRole.CLIENT)
+    status: UserStatus = Field(default=UserStatus.ACTIVE)
+    rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
 
     @field_validator('address')
     def validate_address(cls, v: str) -> str:
@@ -77,47 +118,70 @@ class UserRegister(UserBase):
             raise ValueError('Phone too short')
         return v
 
+    model_config = ConfigDict(from_attributes=True)
 
 class UserCreate(UserRegister):
-    status: UserStatus
-    role: UserRole
-    mentor_id: Optional[uuid.UUID]
-    rank: RankType
-    team_id: Optional[uuid.UUID]
+    pass
 
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr]
-    phone: Optional[str]
-    full_name: Optional[str]
-    role: Optional[UserRole]
-    status: UserStatus
-    timezone: TimeZoneNames
-    mentor_id: Optional[uuid.UUID]
-    mentees_count: int
-    cash_balance: Optional[float]
-    pv_balance: Optional[float]
-    rank_id: RankType
-    team_id: Optional[uuid.UUID]
-    total_personal_sales: Decimal
-    total_team_sales: Decimal
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = Field(default=UserRole.CLIENT)
+    status: Optional[UserStatus] = Field(default=UserStatus.ACTIVE)
+    country: Optional[CountryEnum] = None
+    rank: Optional[MLMRankType] = None
 
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator('email')
+    def validate_email_rfc(cls, v):
+        from email_validator import validate_email, EmailNotValidError
+        try:
+            result = validate_email(v, check_deliverability=False)
+            blocked_domains = {'tempmail.com', 'example.com'}
+            domain = v.split('@')[-1]
+            if domain in blocked_domains:
+                raise ValueError('Disposable emails are not allowed')
+            return result.normalized
+        except EmailNotValidError as e:
+            raise ValueError(str(e))
+
+    @field_validator('phone')
+    def validate_phone(cls, v):
+        if not v.startswith('+'):
+            raise ValueError('Phone must start with +')
+        if len(v) < 10:
+            raise ValueError('Phone too short')
+        return v
 
 class UserPublic(UserBase):
     id: uuid.UUID
+    address: str
+    postcode: str
     role: UserRole
+    rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
     status: UserStatus
+    country: Optional[CountryEnum] = None
+    referral_code: Optional[str] = Field(max_length=12)
     registration_date: datetime
-    team_id: Optional[uuid.UUID]
+    is_active: bool
+
     model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class UserWithMLM(BaseModel):
+    user: UserPublic
+    mlm: Optional[UserMLMInput] = None
 
 
 class UsersPublic(BaseModel):
-    data: list[UserPublic]
+    data: list[UserWithMLM]
     count: int
 
 
-class SignupRequest(BaseModel):
-    user: UserCreate
-    mlm: UserMLMCreate
+class CreateRequest(BaseModel):
+    user: UserCreate | UserPublic
+    mlm: UserMLMInput

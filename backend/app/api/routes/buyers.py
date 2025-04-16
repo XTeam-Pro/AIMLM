@@ -12,13 +12,13 @@ from app.api.dependencies.deps import CurrentUser, RedisDep, UncommittedSessionD
 from app.api.services.purchase_service import PurchaseResponse
 from app.api.services.sale_service import SaleResponse
 from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO, TransactionDAO
-from app.models.user import Product
+from app.models.common import Product
 
 from app.schemas.types.common_types import InteractionType, TransactionType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["Buyer"], prefix="/buyers")
+router = APIRouter(tags=["buyer"], prefix="/buyers")
 
 @router.get("/products", response_model=list[Product])
 def get_sorted_products(
@@ -108,7 +108,7 @@ def buy_product(
 
     try:
         return purchase_service.process_purchase(
-            user_id=current_user.id,
+            buyer_id=current_user.id,
             product_id=product_id
         )
     except HTTPException as he:

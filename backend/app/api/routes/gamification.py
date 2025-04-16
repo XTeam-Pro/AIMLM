@@ -8,33 +8,17 @@ from app.api.dependencies.deps import CurrentUser, CommittedSessionDep, Uncommit
 from app.api.dependencies.gamification_deps import (
     get_recruiting_leaderboard, get_sales_leaderboard, get_activity_leaderboard, get_period_filter
 )
-from app.core.postgres.dao import AchievementDAO, UserAchievementDAO, ChallengeDAO, TeamDAO
+from app.core.postgres.dao import AchievementDAO, UserAchievementDAO, ChallengeDAO
 from app.schemas.gamification import ChallengePublic, ChallengeCreate, AchievementPublic, AchievementCreate, \
-    UserAchievementPublic, TeamPublic, TeamCreate
+    UserAchievementPublic
 from app.schemas.types.gamification_types import LeaderboardPeriod, LeaderboardType
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["Gamification"], prefix="/gamification")
+router = APIRouter(tags=["gamification"], prefix="/gamification")
 
 
-@router.post("/challenge/create_team", response_model=TeamPublic)
-def create_team(current_user: CurrentUser, session: CommittedSessionDep, team_data: TeamCreate):
-    """Create a new team. Current user will be the captain."""
-    if not current_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
-    if TeamDAO(session).find_one_or_none(filters={"name": team_data.name}):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Team with this name already exists")
-
-    team_data.captain_id = current_user.id
-    new_team = TeamDAO(session).add(team_data)
-
-    # Automatically assign the team to the user's achievements or MLM structure
-    # Additional logic could go here if needed.
-
-    return TeamPublic.model_validate(new_team)
 
 
 @router.get("/achievements", response_model=List[AchievementPublic])
@@ -163,8 +147,9 @@ def create_challenge(challenge_data: ChallengeCreate, current_user: CurrentUser,
 
     if ChallengeDAO(session).find_one_or_none({"name": challenge_data.name}):
         raise HTTPException(status_code=409, detail="Challenge already exists")
-
-    challenge = ChallengeDAO(session).add(challenge_data)
+    challenge_dict = challenge_data.model_dump(exclude={"created_by"})
+    challenge_dict["created_by"] = current_user.id
+    challenge = ChallengeDAO(session).add(challenge_dict)
     return ChallengePublic.model_validate(challenge)
 
 

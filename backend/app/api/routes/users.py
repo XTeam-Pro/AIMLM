@@ -1,31 +1,33 @@
+import logging
 import uuid
 from typing import Any
-
 from fastapi import APIRouter, Depends, HTTPException
-
-
+from starlette import status
 from app.api.dependencies.deps import (
     CurrentUser,
     get_current_active_superuser,
     CommittedSessionDep,
     UncommittedSessionDep,
 )
-from app.core.postgres.config import settings
+from app.api.services.hierarchy_service import HierarchyService
 from app.core.postgres.dao import (
     UserProductInteractionDAO,
     UserDAO,
-    CartItemDAO, UserMLMDAO
+    CartItemDAO, UserMLMDAO, TransactionDAO, UserActivityDAO, UserRankHistoryDAO, PurchaseDAO, BonusDAO,
+    UserHierarchyDAO
 )
 from app.core.security import get_password_hash, verify_password
 from app.schemas.auth import UpdatePassword
 from app.schemas.common import Message
-from app.schemas.mlm import UserMLMCreate
-from app.schemas.users import UsersPublic, UserPublic, UserCreate, UserUpdateMe, UserRegister, UserUpdate
-from app.schemas.users import SignupRequest
-from app.utils import generate_new_account_email, send_email
+from app.schemas.mlm import UserMLMCreate, UserMLMInput, UserMLMUpdate
+from app.schemas.types.common_types import MLMRankType, ContractType
+from app.schemas.types.gamification_types import ClubType
+from app.schemas.users import UsersPublic, UserPublic, UserUpdateMe, UserUpdate, UserRegister, UserWithMLM
+from app.schemas.users import CreateRequest
 
 router = APIRouter(prefix="/users", tags=["users"])
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 @router.get(
     "/",
@@ -33,63 +35,32 @@ router = APIRouter(prefix="/users", tags=["users"])
     response_model=UsersPublic,
 )
 def read_users(
-        session: UncommittedSessionDep,
-        skip: int = 0,
-        limit: int = 100
-) -> Any:
-    """
-    Retrieve a specific number of users.
-    """
+    session: UncommittedSessionDep,
+    skip: int = 0,
+    limit: int = 100
+) -> UsersPublic:
     user_dao = UserDAO(session)
-    count = user_dao.count()
+    mlm_dao = UserMLMDAO(session)
+
+    total = user_dao.count()
     users = user_dao.find_all(skip=skip, limit=limit)
-    result = []
+
+    if not users:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No users found")
+
+    user_ids = [user.id for user in users]
+    mlm_records = mlm_dao.find_all(filters={"user_id": ("in", user_ids)})
+    mlm_map = {mlm.user_id: mlm for mlm in mlm_records}
+
+    result_data: list[UserWithMLM] = []
+
     for user in users:
-        result.append(UserPublic.model_validate(user))
+        user_public = UserPublic.model_validate(user)
+        mlm_data = mlm_map.get(user.id)
+        mlm_public = UserMLMInput.model_validate(mlm_data.model_dump()) if mlm_data else None
+        result_data.append(UserWithMLM(user=user_public, mlm=mlm_public))
 
-    return UsersPublic(data=result, count=count)
-
-
-@router.post(
-    "/",
-    dependencies=[Depends(get_current_active_superuser)],
-    response_model=UserPublic
-)
-def create_user(
-        *,
-        session: CommittedSessionDep,
-        user_in: UserCreate
-) -> Any:
-    """
-    Create new user.
-    """
-    user_dao = UserDAO(session)
-    if user_dao.find_one_or_none({"email": user_in.email}):
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system.",
-        )
-
-    user_dict = user_in.model_dump()
-    password = user_dict.pop("password")
-    user_dict["hashed_password"] = get_password_hash(password)
-
-    user = user_dao.add(user_dict)
-
-    if settings.emails_enabled and user_in.email:
-        email_data = generate_new_account_email(
-            email_to=user_in.email,
-            username=user_in.username,
-            password=user_in.password
-        )
-        send_email(
-            email_to=user_in.email,
-            subject=email_data.subject,
-            html_content=email_data.html_content,
-        )
-    return user
-
-
+    return UsersPublic(data=result_data, count=total)
 @router.patch("/me", response_model=UserPublic)
 def update_user_me(
         *,
@@ -106,7 +77,7 @@ def update_user_me(
         existing_user = user_dao.find_one_or_none({"email": user_in.email})
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(
-                status_code=409,
+                status_code=status.HTTP_409_CONFLICT,
                 detail="User with this email already exists"
             )
 
@@ -127,10 +98,10 @@ def update_password_me(
     Update own password.
     """
     if not verify_password(body.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect password")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect password")
     if body.current_password == body.new_password:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password cannot be the same as the current one"
         )
 
@@ -142,13 +113,17 @@ def update_password_me(
     return Message(message="Password updated successfully")
 
 
-@router.get("/me", response_model=UserPublic)
-def read_user_me(current_user: CurrentUser) -> Any:
+@router.get("/me", response_model=CreateRequest)
+def read_user_me(current_user: CurrentUser, session: UncommittedSessionDep) -> Any:
     """
     Get current user.
     """
-    return current_user
-
+    user = UserDAO(session).find_one_or_none_by_id(current_user.id)
+    user_mlm = UserMLMDAO(session).find_one_or_none(filters={"user_id": current_user.id})
+    return CreateRequest(
+        user=UserPublic.model_validate(user),
+        mlm=UserMLMInput.model_validate(user_mlm.model_dump()) if user_mlm else None
+    )
 
 @router.delete("/me", response_model=Message)
 def delete_user_me(
@@ -156,65 +131,88 @@ def delete_user_me(
         current_user: CurrentUser
 ) -> Any:
     """
-    Delete own user.
+    Delete own user. Dangerous! Execute if you know what you are doing.
     """
-    if current_user.is_superuser:
+    if not UserDAO(session).find_one_or_none_by_id(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User with this ID does not exist")
+    if current_user.role ==  "admin":
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Super users are not allowed to delete themselves"
         )
 
     UserProductInteractionDAO(session).delete({"user_id": current_user.id})
+    UserMLMDAO(session).delete({"user_id": current_user.id})
     CartItemDAO(session).delete({"user_id": current_user.id})
+    UserActivityDAO(session).delete({"user_id": current_user.id})
+    TransactionDAO(session).delete({"buyer_id": current_user.id})
+    PurchaseDAO(session).delete({"user_id": current_user.id})
+    UserRankHistoryDAO(session).delete({"user_id": current_user.id})
+    BonusDAO(session).delete({"user_id": current_user.id})
+    UserHierarchyDAO(session).delete({"ancestor_id": current_user.id})
+    UserHierarchyDAO(session).delete({"descendant_id": current_user.id})
     UserDAO(session).delete({"id": current_user.id})
-
     return Message(message="User deleted successfully")
 
 
-@router.post("/signup", response_model=UserPublic)
+@router.post("/signup", response_model=UserWithMLM)
 def register_user(
     session: CommittedSessionDep,
-    signup_data: SignupRequest
-) -> UserPublic:
-    user_in = signup_data.user
-    user_mlm_data = signup_data.mlm
-
+    user_in: UserRegister
+) -> UserWithMLM:
+    """
+    Public signup endpoint. Registers a new user with default MLM settings.
+    """
     user_dao = UserDAO(session)
+
+    # Email already exists
     if user_dao.find_one_or_none({"email": user_in.email}):
         raise HTTPException(
-            status_code=400,
-            detail="The user with this email already exists in the system",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The user with this email already exists in the system"
         )
 
-    user_dict = user_in.model_dump()
-    password = user_dict.pop("password")
-    user_dict["hashed_password"] = get_password_hash(password)
+    # Validate referral code
+    if not user_in.referral_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Referral code is required"
+        )
 
-    user = user_dao.add(user_dict) 
+    sponsor = user_dao.find_one_or_none({"referral_code": user_in.referral_code})
+    if not sponsor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sponsor not found"
+        )
 
-    # Now add MLM data manually
+    # Create user
+    user_dict = user_in.model_dump(exclude={"password", "referral_code"})
+    user_dict["hashed_password"] = get_password_hash(user_in.password)
+    user_dict["referral_code"] = uuid.uuid4().hex[:8]  # Generate new for this user
+    user = user_dao.add(user_dict)
+
+    # Create MLM profile
     user_mlm_dao = UserMLMDAO(session)
     user_mlm_create = UserMLMCreate(
         user_id=user.id,
-        contract_type=user_mlm_data.contract_type,
-        current_rank=user_mlm_data.current_rank,
-        current_club=user_mlm_data.current_club,
-        personal_volume=user_mlm_data.personal_volume,
-        group_volume=user_mlm_data.group_volume,
-        accumulated_volume=user_mlm_data.accumulated_volume,
-        binary_volume_left=user_mlm_data.binary_volume_left,
-        binary_volume_right=user_mlm_data.binary_volume_right,
-        sponsor_id=user_mlm_data.sponsor_id,
-        placement_sponsor_id=user_mlm_data.placement_sponsor_id,
-        bonuses=[],
-        activities=[],
-        ranks_history=[]
+        contract_type=ContractType.BASIC,
+        current_rank=MLMRankType.NEWBIE,
+        current_club=ClubType.PREMIER,
+        sponsor_id=sponsor.id,
+        placement_sponsor_id=None,  # Can later be set automatically
     )
-    user_mlm_dao.add(user_mlm_create)
-
-    return UserPublic.model_validate(user)
-
-@router.get("/{user_id}", response_model=UserPublic)
+    mlm = user_mlm_dao.add(user_mlm_create)
+    # Add to user hierarchy (generational tree)
+    HierarchyService(session).create_chain_for_new_user(
+        sponsor_id=sponsor.id,
+        new_user_id=user.id
+    )
+    return UserWithMLM(
+        user=UserPublic.model_validate(user),
+        mlm=UserMLMInput.model_validate(mlm.model_dump())
+    )
+@router.get("/{user_id}", response_model=CreateRequest)
 def read_user_by_id(
         user_id: uuid.UUID,
         session: CommittedSessionDep,
@@ -223,39 +221,41 @@ def read_user_by_id(
     """
     Get a specific user by id.
     """
-    user_dao = UserDAO(session)
-    user = user_dao.find_one_or_none_by_id(user_id)
-
-    if user == current_user:
-        return user
     if current_user.role != "admin":
         raise HTTPException(
-            status_code=403,
-            detail="The user doesn't have enough privileges",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Only admins can view other users"
         )
-    return user
+    user = UserDAO(session).find_one_or_none_by_id(user_id)
+    user_mlm = UserMLMDAO(session).find_one_or_none(filters={"user_id": user_id})
+    return CreateRequest(
+        user=UserPublic.model_validate(user),
+        mlm=UserMLMInput.model_validate(user_mlm.model_dump()) if user_mlm else None
+    )
 
 
 @router.patch(
     "/{user_id}",
     dependencies=[Depends(get_current_active_superuser)],
-    response_model=UserPublic,
+    response_model=UserWithMLM
 )
 def update_user(
         *,
         session: CommittedSessionDep,
         user_id: uuid.UUID,
         user_in: UserUpdate,
+        user_mlm: UserMLMUpdate,
 ) -> Any:
     """
     Update a user.
     """
     user_dao = UserDAO(session)
+    user_mlm_dao = UserMLMDAO(session)
     db_user = user_dao.find_one_or_none_by_id(user_id)
 
     if not db_user:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="The user with this id does not exist in the system",
         )
 
@@ -263,14 +263,29 @@ def update_user(
         existing_user = user_dao.find_one_or_none({"email": user_in.email})
         if existing_user and existing_user.id != user_id:
             raise HTTPException(
-                status_code=409,
+                status_code=status.HTTP_409_CONFLICT,
                 detail="User with this email already exists"
             )
-
-    return user_dao.update(
+    try:
+        user = user_dao.update(
         {"id": user_id},
-        user_in.model_dump(exclude_unset=True)
-    )
+        user_in
+        )
+        user_mlm = user_mlm_dao.update(
+  {"user_id": user_id},
+            user_mlm)
+        return UserWithMLM(
+            user=UserPublic.model_validate(user),
+            mlm=UserMLMInput.model_validate(user_mlm)
+        )
+    except Exception as e:
+        logger.error("Failed to update user:", e)
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user"
+        )
+
 
 
 @router.delete(
@@ -284,7 +299,7 @@ def delete_user(
         user_id: uuid.UUID
 ) -> Message:
     """
-    Delete a user.
+    Delete a user (Dangerous! Execute if you know what you are doing).
     """
     user_dao = UserDAO(session)
     user = user_dao.find_one_or_none_by_id(user_id)
@@ -293,12 +308,25 @@ def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     if user == current_user:
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Super users are not allowed to delete themselves"
         )
-
-    UserProductInteractionDAO(session).delete({"user_id": user_id})
-    CartItemDAO(session).delete({"user_id": user_id})
-    user_dao.delete({"id": user_id})
-
-    return Message(message="User deleted successfully")
+    try:
+        UserProductInteractionDAO(session).delete({"user_id": user_id})
+        CartItemDAO(session).delete({"user_id": user_id})
+        UserActivityDAO(session).delete({"user_id": user_id})
+        TransactionDAO(session).delete({"buyer_id": user_id})
+        PurchaseDAO(session).delete({"user_id": user_id})
+        UserRankHistoryDAO(session).delete({"user_id": user_id})
+        BonusDAO(session).delete({"user_id": user_id})
+        UserMLMDAO(session).delete({"ancestor_id": user_id})
+        UserHierarchyDAO(session).delete({"descendant_id": user_id})
+        user_dao.delete({"id": user_id})
+        return Message(message="User deleted successfully")
+    except Exception as e:
+        logger.error("Failed to delete this user:", e)
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete this user"
+        )
