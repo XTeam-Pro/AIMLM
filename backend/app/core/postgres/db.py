@@ -3,15 +3,14 @@ from uuid import uuid4
 
 from sqlmodel import Session
 
-from app.core.postgres.dao import TimeZoneDAO, UserDAO, UserMLMDAO
+from app.core.postgres.dao import  UserDAO, UserMLMDAO
 
 from app.core.postgres.config import settings
 
 from app.core.security import get_password_hash
-from app.schemas.localization import TimeZoneCreate
 from app.schemas.types.common_types import MLMRankType, ContractType
-from app.schemas.types.gamification_types import RankType, ClubType
-from app.schemas.types.localization_types import TimeZoneNames, CountryEnum
+from app.schemas.types.gamification_types import  ClubType
+from app.schemas.types.localization_types import  CountryEnum
 from app.schemas.types.user_types import UserRole, UserStatus
 
 def init_db(session: Session) -> None:
