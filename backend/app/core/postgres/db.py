@@ -3,7 +3,8 @@ from uuid import uuid4
 
 from sqlmodel import Session
 
-from app.core.postgres.dao import  UserDAO, UserMLMDAO
+from app.api.services.hierarchy_service import HierarchyService
+from app.core.postgres.dao import UserDAO, UserMLMDAO
 
 from app.core.postgres.config import settings
 
@@ -19,12 +20,10 @@ def init_db(session: Session) -> None:
     """
     user_dao = UserDAO(session)
     mlm_dao = UserMLMDAO(session)
-
     # Check if superuser already exists
     existing_superuser = user_dao.find_one_or_none({"email": settings.FIRST_SUPERUSER})
     if existing_superuser:
-        return  # Already initialized
-
+        return
     # Create fake sponsor user (as upline reference)
     sponsor_data = {
         "email": "sponsor@google.com",
@@ -78,6 +77,9 @@ def init_db(session: Session) -> None:
         "placement_sponsor_id": None,
         "mentor_id": None
     }
-
     mlm_dao.add(mlm_data)
+    HierarchyService(session).create_chain_for_new_user(
+        sponsor_id=sponsor.id,
+        new_user_id=superuser.id
+    )
     session.commit()
