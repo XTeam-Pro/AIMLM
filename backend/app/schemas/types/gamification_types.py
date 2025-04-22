@@ -30,15 +30,15 @@ class ChallengeType(str, Enum):
 
 
 class BonusType(str, Enum):
-    """Detailed bonus types used when TransactionType=BONUS"""
-    MENTOR = "mentor"                # Mentor performance bonus
-    RETAIL = "retail"                # Retail profit premium
-    ACCUMULATIVE = "accumulative"    # Accumulated volume bonus
-    BINARY = "binary"                # Binary structure bonus
-    DEVELOPMENT = "development"      # Network development bonus
-    SPONSOR = "sponsor"              # Direct disposable sponsorship bonus
-    MATCHING = "matching"            # Matching bonus from downline
-    LEADERSHIP = "leadership"        # Leadership level achievement
+    """Detailed bonus types"""
+    MENTOR = "mentor"                  # Mentor performance bonus
+    RETAIL = "retail"                  # Retail profit premium
+    ACCUMULATIVE = "accumulative"      # Accumulated volume bonus
+    BINARY = "binary"                  # Binary structure bonus
+    DEVELOPMENT = "development"        # Network development bonus
+    SPONSOR = "sponsor"                # Direct disposable sponsorship bonus
+    LEADERSHIP = "leadership"          # Leadership level achievement bonus
+    GENERATION = "generation"          # Generation bonus (up to 7 levels of binary income)
 
 class RankType(str, Enum):
     NEWBIE = "newbie"

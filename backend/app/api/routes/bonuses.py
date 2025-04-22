@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from uuid import UUID
-from typing import Dict
+
 
 
 from app.api.dependencies.deps import CommittedSessionDep
@@ -9,28 +9,21 @@ from app.api.services.generation_bonus_service import GenerationBonusService
 from app.api.services.sponsor_bonus_service import SponsorBonusService
 
 from app.core.postgres.dao import BonusDAO
-
+from app.schemas.mlm import BonusCreate, BonusPublic
 
 router = APIRouter(prefix="/bonuses", tags=["bonuses"])
 
 
-@router.get("/generation/{user_id}", response_model=Dict[int, float])
-def get_generation_bonus(
-    user_id: UUID,
+@router.post("/generation/calculate", response_model=list[BonusCreate])
+def calculate_all_generation_bonuses(
     session: CommittedSessionDep
 ):
     """
-    Calculate generation bonus for a given user.
-
-    This bonus is based on the personal volume (PV) of users
-    in the referral tree up to N levels deep, multiplied by
-    percentage rates defined in GenerationBonusMatrix.
+    Calculate generation bonuses for all users.
     """
     service = GenerationBonusService(session)
-    return service.calculate(user_id)
-
-
-@router.get("/binary/{user_id}")
+    return service.calculate()
+@router.get("/binary/{user_id}", response_model=dict[int, dict[str, float]])
 def get_binary_bonus(
     user_id: UUID,
     session: CommittedSessionDep
@@ -38,14 +31,13 @@ def get_binary_bonus(
     """
     Calculate binary bonus for each business center of the user.
 
-    Uses left and right volumes per center and applies
-    a fixed percentage (default 10%) to the weaker leg.
+    Applies fixed percentage (e.g. 10%) to the weaker leg volume.
     """
     service = BinaryBonusService(session)
     return service.calculate(user_id)
 
 
-@router.get("/sponsor/{user_id}")
+@router.get("/sponsor/{user_id}", response_model=dict[str, float])
 def get_sponsor_bonus(
     user_id: UUID,
     session: CommittedSessionDep
@@ -59,48 +51,59 @@ def get_sponsor_bonus(
     return service.calculate(user_id)
 
 
-@router.get("/summary/{user_id}")
+@router.get("/generation/{user_id}", response_model=dict[int, float])
+def get_generation_bonus(
+    user_id: UUID,
+    session: CommittedSessionDep
+):
+    """
+    Calculate generation bonus for a given user.
+
+    Based on binary bonuses earned by descendants up to 7 levels deep.
+    """
+    service = GenerationBonusService(session)
+    return service.calculate_for_user(user_id)
+
+
+@router.get("/summary/{user_id}", response_model=dict[str, float])
 def get_total_bonus_summary(
     user_id: UUID,
     session: CommittedSessionDep
 ):
     """
-    Get total bonus summary for a user.
+    Get total bonus summary for a user across all types.
 
-    Returns generation bonus, binary bonus, sponsor bonus,
-    and their combined total.
+    Includes generation, binary, sponsor, and total bonuses.
     """
     gen_service = GenerationBonusService(session)
     bin_service = BinaryBonusService(session)
     sponsor_service = SponsorBonusService(session)
 
-    generation_bonus = gen_service.calculate(user_id)
-    binary_bonus = bin_service.calculate(user_id)
-    sponsor_bonus = sponsor_service.calculate(user_id)
+    generation = gen_service.calculate_for_user(user_id)
+    binary = bin_service.calculate(user_id)
+    sponsor = sponsor_service.calculate(user_id)
+
+    generation_total = sum(generation.values())
+    binary_total = sum([b["bonus"] for b in binary.values()])
+    sponsor_total = sponsor["total"]
 
     return {
-        "generation_bonus": sum(generation_bonus.values()),
-        "binary_bonus": sum([b["bonus"] for b in binary_bonus.values()]),
-        "sponsor_bonus": sponsor_bonus["total"],
-        "total": (
-            sum(generation_bonus.values()) +
-            sum([b["bonus"] for b in binary_bonus.values()]) +
-            sponsor_bonus["total"]
-        )
+        "generation_bonus": generation_total,
+        "binary_bonus": binary_total,
+        "sponsor_bonus": sponsor_total,
+        "total": generation_total + binary_total + sponsor_total
     }
 
 
-@router.get("/history/{user_id}")
+@router.get("/history/{user_id}", response_model=list[BonusPublic])
 def get_bonus_history(
     user_id: UUID,
     session: CommittedSessionDep
 ):
     """
-    Retrieve bonus history for a given user.
+    Retrieve full bonus history for a user.
 
-    Returns all bonus records from the Bonus table
-    associated with the user.
+    Returns all bonuses stored in the Bonus table.
     """
-    bonus_dao = BonusDAO(session)
-    bonuses = bonus_dao.find_all(filters={"user_id": user_id})
-    return bonuses
+    dao = BonusDAO(session)
+    return dao.find_all(filters={"user_id": user_id})

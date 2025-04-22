@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "changethis"
     POSTGRES_DB: str = "app"
-    REDIS_URL: str = "redis://redis:6379"
+    REDIS_URL: str = "redis://localhost:6379"
     MONGO_URL: str = "mongodb://mongo_db:27017/"
     MONGO_DB: str = "vilavi_shop_db"
     MONGO_INIT: int = 1

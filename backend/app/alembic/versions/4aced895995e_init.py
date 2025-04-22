@@ -1,8 +1,8 @@
 """init
 
-Revision ID: b2c50c075b88
+Revision ID: 4aced895995e
 Revises: 
-Create Date: 2025-04-16 12:19:26.019049
+Create Date: 2025-04-18 06:54:28.935310
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = 'b2c50c075b88'
+revision = '4aced895995e'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -66,8 +66,10 @@ def upgrade():
     sa.Column('full_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('postcode', sqlmodel.sql.sqltypes.AutoString(length=12), nullable=False),
     sa.Column('address', sqlmodel.sql.sqltypes.AutoString(length=200), nullable=False),
+    sa.Column('country', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('role', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('referral_code', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('hashed_password', sqlmodel.sql.sqltypes.AutoString(length=128), nullable=False),
     sa.Column('registration_date', sa.DateTime(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
@@ -75,6 +77,7 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_index(op.f('ix_users_referral_code'), 'users', ['referral_code'], unique=True)
     op.create_table('cart_items',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
@@ -98,24 +101,6 @@ def upgrade():
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_by', sa.Uuid(), nullable=False),
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('transactions',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('buyer_id', sa.Uuid(), nullable=False),
-    sa.Column('seller_id', sa.Uuid(), nullable=False),
-    sa.Column('cash_amount', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('pv_amount', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('status', sa.Enum('PENDING', 'FAILED', 'COMPLETED', name='transactionstatus'), nullable=False),
-    sa.Column('product_id', sa.Uuid(), nullable=True),
-    sa.Column('achievement_id', sa.Uuid(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('additional_info', sa.JSON(), nullable=True),
-    sa.ForeignKeyConstraint(['achievement_id'], ['achievements.id'], ),
-    sa.ForeignKeyConstraint(['buyer_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
-    sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_achievements',
@@ -173,6 +158,17 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('wallets',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('user_id', sa.Uuid(), nullable=False),
+    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('balance', sa.Numeric(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_wallets_user_id'), 'wallets', ['user_id'], unique=False)
     op.create_table('bonuses',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
@@ -210,20 +206,26 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('purchases',
+    op.create_table('transactions',
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('is_starter', sa.Boolean(), nullable=False),
-    sa.Column('purchase_date', sa.DateTime(), nullable=False),
-    sa.Column('total_amount', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('buyer_id', sa.Uuid(), nullable=False),
+    sa.Column('seller_id', sa.Uuid(), nullable=False),
+    sa.Column('source_wallet_id', sa.Uuid(), nullable=True),
+    sa.Column('target_wallet_id', sa.Uuid(), nullable=True),
+    sa.Column('cash_amount', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('pv_amount', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('is_client_purchase', sa.Boolean(), nullable=False),
-    sa.Column('client_id', sa.Uuid(), nullable=True),
-    sa.Column('transaction_id', sa.Uuid(), nullable=True),
-    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['transaction_id'], ['transactions.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('product_id', sa.Uuid(), nullable=True),
+    sa.Column('achievement_id', sa.Uuid(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('additional_info', sa.JSON(), nullable=True),
+    sa.ForeignKeyConstraint(['achievement_id'], ['achievements.id'], ),
+    sa.ForeignKeyConstraint(['buyer_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['source_wallet_id'], ['wallets.id'], ),
+    sa.ForeignKeyConstraint(['target_wallet_id'], ['wallets.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_activities',
@@ -250,6 +252,22 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['user_mlm.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('purchases',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('user_id', sa.Uuid(), nullable=False),
+    sa.Column('is_starter', sa.Boolean(), nullable=False),
+    sa.Column('purchase_date', sa.DateTime(), nullable=False),
+    sa.Column('total_amount', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('pv_amount', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('is_client_purchase', sa.Boolean(), nullable=False),
+    sa.Column('client_id', sa.Uuid(), nullable=True),
+    sa.Column('transaction_id', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['transaction_id'], ['transactions.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('purchase_items',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('purchase_id', sa.Uuid(), nullable=False),
@@ -267,19 +285,22 @@ def upgrade():
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('purchase_items')
+    op.drop_table('purchases')
     op.drop_table('user_rank_history')
     op.drop_table('user_activities')
-    op.drop_table('purchases')
+    op.drop_table('transactions')
     op.drop_table('challenge_participants')
     op.drop_table('business_centers')
     op.drop_table('bonuses')
+    op.drop_index(op.f('ix_wallets_user_id'), table_name='wallets')
+    op.drop_table('wallets')
     op.drop_table('user_product_interactions')
     op.drop_table('user_mlm')
     op.drop_table('user_hierarchy')
     op.drop_table('user_achievements')
-    op.drop_table('transactions')
     op.drop_table('challenges')
     op.drop_table('cart_items')
+    op.drop_index(op.f('ix_users_referral_code'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
     op.drop_table('time_zones')

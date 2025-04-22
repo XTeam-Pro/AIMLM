@@ -49,7 +49,6 @@ class UserAchievementCreate(UserAchievementBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-# Схема для обновления данных UserAchievement
 class UserAchievementUpdate(BaseModel):
     progress: Optional[Decimal]
     is_unlocked: Optional[bool]

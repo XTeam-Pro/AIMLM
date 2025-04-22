@@ -20,6 +20,7 @@ class TimeZoneNames(str, Enum):
     JST = "Japan Standard Time"           # UTC+9
 
 class CurrencyType(str, Enum):
+    USD = "USD"
     RUB = "RUB"
     EUR = "EUR"
     KZT = "KZT"

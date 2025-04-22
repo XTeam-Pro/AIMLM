@@ -8,7 +8,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 from app.models.gamification import Achievement
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.models.user import User, Wallet
 from app.schemas.types.common_types import TransactionStatus
 
 
@@ -114,27 +114,25 @@ class Transaction(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
-    # User relationships
     buyer_id: uuid.UUID = Field(foreign_key="users.id")
     seller_id: uuid.UUID = Field(foreign_key="users.id")
 
-    # Amount fields
+    # Links to wallets
+    source_wallet_id: Optional[uuid.UUID] = Field(default=None, foreign_key="wallets.id")
+    target_wallet_id: Optional[uuid.UUID] = Field(default=None, foreign_key="wallets.id")
+
     cash_amount: Decimal = Field(..., max_digits=12, decimal_places=2)
     pv_amount: Decimal = Field(..., max_digits=12, decimal_places=2)
 
-    # Transaction details
     type: str = Field(...,)
-    status: TransactionStatus = Field(default=TransactionStatus.PENDING)
+    status: str = Field(default=TransactionStatus.PENDING)
 
-    # Optional references to product and achievement
     product_id: Optional[uuid.UUID] = Field(default=None, foreign_key="products.id")
     achievement_id: Optional[uuid.UUID] = Field(default=None, foreign_key="achievements.id")
 
-    # Timestamp and additional info
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     additional_info: Optional[dict[str, Any]] = Field(default=None, sa_type=JSON)
 
-    # Relationships
     buyer: "User" = Relationship(
         back_populates="buyer_transactions",
         sa_relationship_kwargs={"foreign_keys": "[Transaction.buyer_id]"}
@@ -144,5 +142,13 @@ class Transaction(SQLModel, table=True):
         back_populates="seller_transactions",
         sa_relationship_kwargs={"foreign_keys": "[Transaction.seller_id]"}
     )
+
+    source_wallet: Optional["Wallet"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Transaction.source_wallet_id]"}
+    )
+    target_wallet: Optional["Wallet"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Transaction.target_wallet_id]"}
+    )
+
     product: Optional["Product"] = Relationship()
     achievement: Optional["Achievement"] = Relationship()

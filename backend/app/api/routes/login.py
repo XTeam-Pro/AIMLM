@@ -43,7 +43,6 @@ def login_access_token(
     OAuth2 compatible token login, get an access token for future requests
     """
     # Authenticate user through DAO
-    logger.info(f"Step 1: login_access_token  email {form_data.username } pass {form_data.password }")
     user_dao = UserDAO(session)
     user = user_dao.authenticate(
         email=form_data.username,

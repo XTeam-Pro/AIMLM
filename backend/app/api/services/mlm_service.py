@@ -22,7 +22,7 @@ class MLMService:
         self.sponsor_bonus_service.distribute(buyer_id)
 
         # 2. Credit genaration bonus
-        self.generation_bonus_service.calculate_and_apply(buyer_id)
+       # self.generation_bonus_service.calculate_and_apply(buyer_id)
 
         # 3. Update binary volume and credit binary bonus
         self.binary_bonus_service.process_binary_impact(buyer_id)

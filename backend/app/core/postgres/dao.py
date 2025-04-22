@@ -6,7 +6,7 @@ from app.core.postgres.base import BaseDAO
 from app.core.security import verify_password
 from app.models.mlm import UserMLM, Bonus, UserHierarchy, BusinessCenter, GenerationBonusMatrix, UserActivity, \
     UserRankHistory
-from app.models.user import User, UserProductInteraction, Transaction,TimeZone
+from app.models.user import User, UserProductInteraction, Transaction, TimeZone, Wallet, ExchangeRate
 from app.models.gamification import Achievement, UserAchievement, Challenge, UserChallenge
 from app.models.common import CartItem, Product, Purchase
 
@@ -23,22 +23,24 @@ class UserDAO(BaseDAO[User]):
             return None
         return user
 
-    def update_cash_balance(self, user_id: UUID, amount: Decimal) -> User:
-        """Atomic user cash balance update"""
-        user = self.find_one_or_none_by_id(user_id)
-        if not user:
-            raise ValueError("User not found")
+class ExchangeRateDAO(BaseDAO[ExchangeRate]):
+    model = ExchangeRate
 
-        user.cash_balance += amount
-        return self.update({"id": user_id}, {"cash_balance": user.cash_balance})
+class WalletDAO(BaseDAO[Wallet]):
+    model = Wallet
 
-    def update_pv_balance(self, user_id: UUID, amount: Decimal):
-        """Atomic user pv balance update"""
-        user = self.find_one_or_none_by_id(user_id)
-        if not user:
-            raise ValueError("User not found")
-        user.pv_balance += amount
-        return self.update({"id": user_id}, {"pv_balance": user.pv_balance})
+    def get_user_wallet(self, user_id: UUID, wallet_type: str) -> Wallet:
+        return self.find_one_or_none({
+            "user_id": user_id,
+            "type": wallet_type
+        })
+
+    def update_balance(self, user_id: UUID, wallet_type: str, amount: Decimal):
+        wallet = self.get_user_wallet(user_id, wallet_type)
+        if not wallet:
+            raise ValueError("Wallet not found")
+        wallet.balance += amount
+        return self.update({"id": wallet.id}, {"balance": wallet.balance})
 
 class ProductDAO(BaseDAO[Product]):
     model = Product
@@ -69,6 +71,15 @@ class BonusDAO(BaseDAO[Bonus]):
 
 class UserMLMDAO(BaseDAO[UserMLM]):
     model = UserMLM
+
+    def update_pv_balance(self, user_id: UUID, amount: Decimal):
+        """Atomic user pv balance update"""
+        mlm_user = self.find_one_or_none_by_id(user_id)
+        if not mlm_user:
+            raise ValueError("User not found")
+        mlm_user.personal_volume += amount
+        return self.update({"user_id": user_id}, {"pv_balance": mlm_user.personal_volume})
+
 
 class PurchaseDAO(BaseDAO[Purchase]):
     model = Purchase

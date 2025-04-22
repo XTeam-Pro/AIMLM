@@ -1,7 +1,14 @@
-from decimal import Decimal
 from uuid import UUID
+from decimal import Decimal
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
-from app.core.postgres.dao import UserHierarchyDAO, UserMLMDAO, BonusDAO, UserDAO
+
+from app.core.postgres.dao import (
+    UserDAO,
+    PurchaseDAO,
+    BonusDAO, UserMLMDAO
+)
 from app.schemas.mlm import BonusCreate
 from app.schemas.types.gamification_types import BonusType
 from app.schemas.types.localization_types import CurrencyType
@@ -10,46 +17,60 @@ from app.schemas.types.localization_types import CurrencyType
 class SponsorBonusService:
     def __init__(self, session: Session):
         self.session = session
-        self.hierarchy_dao = UserHierarchyDAO(session)
-        self.user_mlm_dao = UserMLMDAO(session)
         self.user_dao = UserDAO(session)
+        self.user_mlm_dao = UserMLMDAO(session)
+        self.purchase_dao = PurchaseDAO(session)
         self.bonus_dao = BonusDAO(session)
 
-    def calculate(self, user_id: UUID) -> dict:
-        level_1 = self.hierarchy_dao.find_all(filters={
-            "ancestor_id": user_id,
-            "level": 1
-        })
+    def _get_current_period(self) -> str:
+        now = datetime.now(timezone.utc)
+        return f"{now.year}-{now.month:02}"
 
-        total_bonus = 0
-        per_user = []
+    def calculate(self, user_id: UUID) -> dict[str, float]:
+        """
+        Calculate and apply sponsor bonus for direct referrals (level 1).
+        Only applies to first purchase, and only if not already paid.
+        """
+        sponsored_users = self.user_mlm_dao.find_all(filters={"sponsor_id": user_id})
+        total_bonus = Decimal("0.00")
 
-        for record in level_1:
-            user_mlm = self.user_mlm_dao.find_one_or_none({"user_id": record.descendant_id})
-            if user_mlm:
-                pv = float(user_mlm.personal_volume or 0)
-                bonus = pv * 0.05  # 5% sponsor bonus  (fixed)
-                total_bonus += bonus
-                per_user.append({
-                    "user_id": str(record.descendant_id),
-                    "personal_volume": pv,
-                    "bonus": round(bonus, 2)
-                })
+        for user in sponsored_users:
+            # Find first purchase of this referral
+            purchases = self.purchase_dao.find_all(filters={"user_id": user.id})
+            if not purchases:
+                continue
 
-        return {
-            "total": round(total_bonus, 2),
-            "details": per_user
-        }
+            first_purchase = min(purchases, key=lambda p: p.created_at)
 
-    def distribute(self, user_id: UUID):
-        result = self.calculate(user_id)
-        for item in result["details"]:
-            self.user_dao.update_cash_balance(item["user_id"], Decimal(item["bonus"]))
+            # Check if sponsor bonus already paid for this referral
+            already_paid = self.bonus_dao.find_one_or_none(filters={
+                "user_id": user_id,
+                "bonus_type": BonusType.SPONSOR
+            })
+            if already_paid:
+                continue
+
+            # Calculate 5% of PV from first purchase
+            pv = first_purchase.pv_value or Decimal(0)
+            bonus_amount = (pv * Decimal("0.05")).quantize(Decimal("0.01"))
+
+            if bonus_amount <= 0:
+                continue
+
+            # Create sponsor bonus
             self.bonus_dao.add(BonusCreate(
-                user_id=item["user_id"],
-                amount=item["bonus"],
+                user_id=user_id,
+                amount=bonus_amount,
                 bonus_type=BonusType.SPONSOR,
                 is_paid=True,
                 currency=CurrencyType.RUB,
-                calculation_period="30 days"
+                calculation_period=self._get_current_period(),
             ))
+
+            total_bonus += bonus_amount
+
+        return {
+            "total": float(total_bonus),
+            "sponsored_count": len(sponsored_users),
+            "bonus_created": bool(total_bonus > 0)
+        }

@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlmodel import Session
 
 from app.api.services.hierarchy_service import HierarchyService
+from app.api.services.wallet_service import WalletService
 from app.core.postgres.dao import UserDAO, UserMLMDAO
 
 from app.core.postgres.config import settings
@@ -11,8 +12,9 @@ from app.core.postgres.config import settings
 from app.core.security import get_password_hash
 from app.schemas.types.common_types import MLMRankType, ContractType
 from app.schemas.types.gamification_types import  ClubType
-from app.schemas.types.localization_types import  CountryEnum
+from app.schemas.types.localization_types import CountryEnum, CurrencyType
 from app.schemas.types.user_types import UserRole, UserStatus
+
 
 def init_db(session: Session) -> None:
     """
@@ -20,6 +22,8 @@ def init_db(session: Session) -> None:
     """
     user_dao = UserDAO(session)
     mlm_dao = UserMLMDAO(session)
+    wallet_service = WalletService(session)
+    hierarchy_service = HierarchyService(session)
     # Check if superuser already exists
     existing_superuser = user_dao.find_one_or_none({"email": settings.FIRST_SUPERUSER})
     if existing_superuser:
@@ -40,8 +44,8 @@ def init_db(session: Session) -> None:
         "postcode": "123456",
         "referral_code": uuid4().hex[:8]
     }
-
     sponsor = user_dao.add(sponsor_data)
+    wallet_service.create_default_wallets(sponsor.id, CurrencyType.RUB)
 
     # Create actual superuser
     superuser_data = {
@@ -61,7 +65,7 @@ def init_db(session: Session) -> None:
     }
 
     superuser = user_dao.add(superuser_data)
-
+    wallet_service.create_default_wallets(superuser.id, CurrencyType.USD)
     # Create MLM data for superuser
     mlm_data = {
         "user_id": superuser.id,
@@ -78,7 +82,7 @@ def init_db(session: Session) -> None:
         "mentor_id": None
     }
     mlm_dao.add(mlm_data)
-    HierarchyService(session).create_chain_for_new_user(
+    hierarchy_service.create_chain_for_new_user(
         sponsor_id=sponsor.id,
         new_user_id=superuser.id
     )

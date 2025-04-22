@@ -294,7 +294,7 @@ def get_recommendations_by_purchase(
         )
     try:
         purchased = TransactionDAO(session).find_all(filters={
-            "user_id": current_user.id,
+            "buyer_id": current_user.id,
             "transaction_type": TransactionType.PRODUCT_PURCHASE
         })
         purchased_ids = [item.product_id for item in purchased if item.product_id]

@@ -15,7 +15,7 @@ class RankPromotionService:
         self.rank_history_dao = UserRankHistoryDAO(session)
         self.hierarchy_service = HierarchyService(session)
 
-        # Конфигурация рангов (минимальный PV в линии)
+        # Rank configuration  (minimal PV in the line )
         self.rank_requirements = {
             MLMRankType.CARAT_1: Decimal("500"),
             MLMRankType.CARAT_2: Decimal("1000"),
@@ -71,5 +71,5 @@ class RankPromotionService:
 
     def _current_period_str(self):
         """Returns string like '2025-04' for history"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return f"{now.year}-{now.month:02}"

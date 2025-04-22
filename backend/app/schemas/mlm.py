@@ -22,7 +22,7 @@ class UserMLMBase(BaseModel):
     binary_volume_right: Decimal = Field(default=Decimal(0))
     sponsor_id: Optional[uuid.UUID] = Field(...,)
     mentor_id: Optional[uuid.UUID] = None
-    placement_sponsor_id: Optional[uuid.UUID] = Field(default=None)
+    placement_sponsor_id: Optional[uuid.UUID] = Field(default=sponsor_id)
 
 class UserMLMInput(UserMLMBase):
     model_config = ConfigDict(from_attributes=True)
@@ -160,8 +160,12 @@ class GenerationBonusMatrixBase(BaseModel):
     generation: int
     bonus_percentage: Decimal
 
+
 class GenerationBonusMatrixCreate(GenerationBonusMatrixBase):
     pass
+
+class GenerationBonusMatrixList(BaseModel):
+    rows: list[GenerationBonusMatrixCreate]
 
 class GenerationBonusMatrixUpdate(GenerationBonusMatrixBase):
     pass

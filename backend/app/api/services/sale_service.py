@@ -6,24 +6,21 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 from app.api.services.mlm_service import MLMService
+from app.api.services.wallet_service import WalletService
 from app.core.postgres.dao import (
     ProductDAO,
     UserDAO,
-    TransactionDAO, BonusDAO,
+    TransactionDAO,
+    BonusDAO,
 )
-from app.schemas.common import (
-    TransactionCreate,
-)
+from app.schemas.common import TransactionCreate
 from app.schemas.types.common_types import TransactionType, TransactionStatus
 
-
-class UpdatedBalances(BaseModel):
-    distributor_pv: float
-    distributor_cash: float
 
 class SellerBalances(BaseModel):
     cash: Decimal
     pv: Decimal
+
 
 class SaleResponse(BaseModel):
     message: str
@@ -34,6 +31,7 @@ class SaleResponse(BaseModel):
     new_pv_balance: Decimal
     transaction_type: TransactionType
 
+
 class SaleService:
     def __init__(self, session):
         self.session = session
@@ -42,10 +40,12 @@ class SaleService:
         self._transaction_dao = TransactionDAO(session)
         self._mlm_service = MLMService(session)
         self._bonus_dao = BonusDAO(session)
+        self._wallet_service = WalletService(session)
+        self._company_account_id = UUID("00000000-0000-0000-0000-000000000001")
 
     def process_sale(self, seller_id: UUID, product_id: UUID, buyer_id: UUID) -> SaleResponse:
         """Process MLM sale transaction with full bonus distribution"""
-        seller = self._validate_seller(seller_id)
+        self._validate_seller(seller_id)
         buyer = self._get_user(buyer_id)
         product = self._validate_product(product_id)
 
@@ -53,16 +53,33 @@ class SaleService:
 
         is_sponsor_sale = buyer.sponsor_id == seller_id
 
+        # Расчёт долей
+        seller_share = product.price * Decimal('0.5' if is_sponsor_sale else '0.3')
+        company_share = product.price - seller_share
+        pv_value = product.pv_value
 
-        # Update balances
-        seller_balances = self._update_balances(
-            seller_id=seller_id,
-            buyer_id=buyer_id,
-            product=product,
-            is_sponsor_sale=is_sponsor_sale
+        # Переводы средств и PV
+        self._wallet_service.move_funds_and_log_transaction(
+            source_user_id=buyer_id,
+            target_user_id=seller_id,
+            amount=seller_share,
+            transaction_type=TransactionType.NETWORK_SALE,
+            pv_amount=pv_value,
+            product_id=product.id,
+            note="MLM продажа (доля дистрибьютора)"
         )
 
-        # Create transaction
+        self._wallet_service.move_funds_and_log_transaction(
+            source_user_id=buyer_id,
+            target_user_id=self._company_account_id,
+            amount=company_share,
+            transaction_type=TransactionType.NETWORK_SALE,
+            pv_amount=Decimal(0),
+            product_id=product.id,
+            note="MLM продажа (доля компании)"
+        )
+
+        # Создание транзакции
         transaction = self._create_transaction(
             seller_id=seller_id,
             buyer_id=buyer_id,
@@ -70,39 +87,21 @@ class SaleService:
             transaction_type=TransactionType.NETWORK_SALE
         )
 
-        # Distribute MLM bonuses
+        # Распределение бонусов
         if is_sponsor_sale:
             self._distribute_mlm_bonuses(buyer_id, product)
 
+        # Возврат актуальных балансов продавца
+        seller = self._user_dao.find_one_or_none_by_id(seller_id)
         return SaleResponse(
             message="Sale processed successfully",
             transaction_id=transaction.id,
             cash_amount=product.price,
             pv_amount=product.pv_value,
-            new_cash_balance=seller_balances.cash,
-            new_pv_balance=seller_balances.pv,
+            new_cash_balance=seller.cash_balance,
+            new_pv_balance=seller.pv_balance,
             transaction_type=TransactionType.NETWORK_SALE,
         )
-
-
-    def _update_balances(self, seller_id: UUID, buyer_id: UUID, product, is_sponsor_sale: bool):
-        """Update all relevant balances with MLM logic"""
-        # Deduct from buyer
-        self._user_dao.update_cash_balance(buyer_id, -product.price)
-
-        # Calculate seller share (50% for sponsor, 30% for direct sale)
-        seller_share = product.price * Decimal('0.5' if is_sponsor_sale else '0.3')
-        self._user_dao.update_cash_balance(seller_id, seller_share)
-
-        # Add PV to seller
-        self._user_dao.update_pv_balance(seller_id, product.pv_value)
-
-        # Company gets remaining amount
-        company_share = product.price - seller_share
-        self._user_dao.update_company_balance(company_share)
-
-        seller = self._user_dao.find_one_or_none_by_id(seller_id)
-        return SellerBalances(cash=seller.cash_balance, pv=seller.pv_balance)
 
     def _create_transaction(self, seller_id: UUID, buyer_id: UUID, product, transaction_type: TransactionType):
         """Create transaction record according to MLM structure"""
@@ -126,13 +125,12 @@ class SaleService:
 
     def _distribute_mlm_bonuses(self, buyer_id: UUID, product):
         """Trigger MLM bonus distribution"""
-        self._mlm_service.distribute_mlm_bonuses(
+        self._mlm_service.on_product_purchase(
             buyer_id=buyer_id,
             product_price=product.price,
             pv_value=product.pv_value
         )
 
-    # Validation methods
     def _validate_seller(self, user_id: UUID):
         user = self._user_dao.find_one_or_none_by_id(user_id)
         if not user or not user.is_distributor:

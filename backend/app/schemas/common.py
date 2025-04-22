@@ -71,6 +71,8 @@ class TransactionBase(BaseModel):
 class TransactionCreate(TransactionBase):
     product_id: Optional[uuid.UUID]
     status: TransactionStatus
+    source_wallet_id: uuid.UUID
+    target_wallet_id: uuid.UUID
     buyer_id: uuid.UUID
     seller_id: uuid.UUID
 

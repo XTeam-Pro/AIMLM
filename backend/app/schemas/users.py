@@ -1,4 +1,6 @@
 import re
+from decimal import Decimal
+
 from email_validator import EmailNotValidError, validate_email
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, Field
 from typing import Optional
@@ -6,10 +8,44 @@ import uuid
 from datetime import datetime
 
 from app.schemas.types.common_types import MLMRankType
-from app.schemas.types.localization_types import  CountryEnum
+from app.schemas.types.localization_types import CountryEnum, CurrencyType
 
-from app.schemas.types.user_types import UserRole, UserStatus
+from app.schemas.types.user_types import UserRole, UserStatus, WalletType
 from app.schemas.mlm import  UserMLMInput
+
+class WalletBase(BaseModel):
+    currency: CurrencyType = Field(...,)
+    balance: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=12, decimal_places=2)
+    is_active: bool = Field(default=True, description="Whether a wallet is active or not")
+    type: WalletType = Field(default=WalletType.BONUS)
+    @field_validator("balance")
+    def validate_balance_positive(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("Balance cannot be negative")
+        return v
+
+
+
+class WalletCreate(WalletBase):
+    user_id: uuid.UUID = Field(..., )
+
+
+class WalletUpdate(BaseModel):
+    balance: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    is_active: bool | None = Field(default=None)
+
+    @field_validator("balance")
+    def validate_balance_if_provided(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and v < 0:
+            raise ValueError("Balance cannot be negative")
+        return v
+
+
+class WalletPublic(WalletBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdateMe(BaseModel):
@@ -77,12 +113,12 @@ class TestSponsorCreate(UserBase):
 
 class UserRegister(UserBase):
     password: str
-    address: str
+    address: str = Field(examples=["Nevsky Prospekt, Saint Petersburg"])
     referral_code: Optional[str] = Field(default=None, max_length=12)
     postcode: str
     role: UserRole = Field(default=UserRole.CLIENT)
     status: UserStatus = Field(default=UserStatus.ACTIVE)
-    rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
+    rank: MLMRankType | None = Field(default=MLMRankType.NEWBIE)
 
     @field_validator('address')
     def validate_address(cls, v: str) -> str:
@@ -163,7 +199,7 @@ class UserPublic(UserBase):
     address: str
     postcode: str
     role: UserRole
-    rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
+    rank: MLMRankType | None
     status: UserStatus
     country: Optional[CountryEnum] = None
     referral_code: Optional[str] = Field(max_length=12)
