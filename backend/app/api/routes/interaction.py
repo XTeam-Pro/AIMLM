@@ -16,7 +16,7 @@ from app.schemas.types.common_types import InteractionType, TransactionType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["interaction"], prefix="/interaction")
+router = APIRouter(tags=["Interaction"], prefix="/interaction")
 
 @router.get("/get_purchased", response_model=list[TransactionPublic])
 def get_my_products(

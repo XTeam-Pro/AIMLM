@@ -18,7 +18,7 @@ from app.schemas.types.common_types import InteractionType, TransactionType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["buyer"], prefix="/buyers")
+router = APIRouter(tags=["Buyer"], prefix="/buyers")
 
 @router.get("/products", response_model=list[Product])
 def get_sorted_products(

@@ -10,12 +10,12 @@ from app.api.dependencies.deps import (
     UncommittedSessionDep,
 )
 from app.api.services.hierarchy_service import HierarchyService
-from app.api.services.wallet_service import WalletService
+
 from app.core.postgres.dao import (
     UserProductInteractionDAO,
     UserDAO,
     CartItemDAO, UserMLMDAO, TransactionDAO, UserActivityDAO, UserRankHistoryDAO, PurchaseDAO, BonusDAO,
-    UserHierarchyDAO, WalletDAO
+    UserHierarchyDAO#, WalletDAO
 )
 from app.core.security import get_password_hash, verify_password
 from app.schemas.auth import UpdatePassword
@@ -23,11 +23,10 @@ from app.schemas.common import Message
 from app.schemas.mlm import UserMLMCreate, UserMLMInput, UserMLMUpdate
 from app.schemas.types.common_types import MLMRankType, ContractType
 from app.schemas.types.gamification_types import ClubType
-from app.schemas.types.localization_types import CurrencyType
 from app.schemas.users import UsersPublic, UserPublic, UserUpdateMe, UserUpdate, UserRegister, UserWithMLM
 from app.schemas.users import CreateRequest
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["Users"])
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -165,10 +164,9 @@ def register_user(
 ) -> UserWithMLM:
     """
     Public signup endpoint. Registers a new user with default MLM settings.
-    is_client: Whether the user wants to be in the MLM structure or not
+    - is_client: Whether the user wants to be in the MLM structure or not
     """
     user_dao = UserDAO(session)
-    wallet_service = WalletService(session)
     user_mlm_dao = UserMLMDAO(session)
     hierarchy_service = HierarchyService(session)
 
@@ -192,30 +190,29 @@ def register_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sponsor not found"
         )
+
     # Create user
     user_dict = user_in.model_dump(exclude={"password", "referral_code"})
     user_dict["hashed_password"] = get_password_hash(user_in.password)
     user_dict["referral_code"] = uuid.uuid4().hex[:8]
-    user_dict["rank"] = None if is_client else user_in.rank
+    user_dict["sponsor_id"] = sponsor.id
     user = user_dao.add(user_dict)
-    # Create MLM profile
+
+    # Create MLM profile only for non-clients
     mlm = None
     if not is_client:
         user_mlm_create = UserMLMCreate(
-        user_id=user.id,
-        contract_type=ContractType.BASIC,
-        current_rank=MLMRankType.NEWBIE,
-        current_club=ClubType.PREMIER,
-        sponsor_id=sponsor.id,
-        placement_sponsor_id=sponsor.id,  # Can later be set automatically
+            user_id=user.id,
+            contract_type=ContractType.BASIC,
+            current_rank=MLMRankType.NEWBIE,
+            current_club=ClubType.PREMIER,
+            placement_sponsor_id=sponsor.id,
         )
         mlm = user_mlm_dao.add(user_mlm_create)
-        # Add to user hierarchy (generational tree)
         hierarchy_service.create_chain_for_new_user(
             sponsor_id=sponsor.id,
             new_user_id=user.id
         )
-    wallet_service.create_default_wallets(user.id, CurrencyType.RUB)
     return UserWithMLM(
         user=UserPublic.model_validate(user),
         mlm=UserMLMInput.model_validate(mlm) if mlm else None
@@ -321,7 +318,7 @@ def delete_user(
         )
     try:
         UserProductInteractionDAO(session).delete({"user_id": user_id})
-        WalletDAO(session).delete({"user_id": user_id})
+        #WalletDAO(session).delete({"user_id": user_id})
         CartItemDAO(session).delete({"user_id": user_id})
         UserActivityDAO(session).delete({"user_id": user_id})
         TransactionDAO(session).delete({"buyer_id": user_id})

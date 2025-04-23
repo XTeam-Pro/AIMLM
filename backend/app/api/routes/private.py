@@ -5,7 +5,7 @@ from starlette import status
 
 from app.api.dependencies.deps import CommittedSessionDep
 from app.api.services.hierarchy_service import HierarchyService
-from app.api.services.wallet_service import WalletService
+#from app.api.services.wallet_service import WalletService
 from app.core.postgres.dao import UserDAO, UserMLMDAO
 from app.core.security import get_password_hash
 from app.schemas.mlm import UserMLMCreate, UserMLMInput
@@ -13,7 +13,7 @@ from app.schemas.types.localization_types import CurrencyType
 
 from app.schemas.users import UserPublic, CreateRequest, TestSponsorCreate, UserWithMLM
 
-router = APIRouter(tags=["private"], prefix="/private")
+router = APIRouter(tags=["Private"], prefix="/private")
 
 @router.post("/create-sponsor", response_model=UserPublic)
 def create_test_sponsor(
@@ -21,14 +21,14 @@ def create_test_sponsor(
     session: CommittedSessionDep
 ):
     user_dao = UserDAO(session)
-    wallet_service = WalletService(session)
+    #wallet_service = WalletService(session)
     if user_dao.find_one_or_none({"email": sponsor_in.email}):
         raise HTTPException(status_code=400, detail="Sponsor with this email already exists")
     sponsor_dict = sponsor_in.model_dump()
     password = sponsor_dict.pop("password")
     sponsor_dict["hashed_password"] = get_password_hash(password)
     new_sponsor = user_dao.add(sponsor_dict)
-    wallet_service.create_default_wallets(new_sponsor.id, CurrencyType.RUB)
+    #wallet_service.create_default_wallets(new_sponsor.id, CurrencyType.RUB)
     return UserPublic.model_validate(new_sponsor)
 
 
@@ -41,7 +41,7 @@ def create_user(signup_data: CreateRequest, session: CommittedSessionDep) -> Any
     user_in = signup_data.user
     user_mlm_data = signup_data.mlm
     user_dao = UserDAO(session)
-    wallet_service = WalletService(session)
+    #wallet_service = WalletService(session)
     hierarchy_service = HierarchyService(session)
 
     if user_dao.find_one_or_none({"email": user_in.email}):
@@ -70,7 +70,7 @@ def create_user(signup_data: CreateRequest, session: CommittedSessionDep) -> Any
         sponsor_id=sponsor.id,
         new_user_id=user.id,
     )
-    wallet_service.create_default_wallets(user.id, CurrencyType.RUB)
+    #wallet_service.create_default_wallets(user.id, CurrencyType.RUB)
     # Add MLM data
     user_mlm_dao = UserMLMDAO(session)
     user_mlm_create = UserMLMCreate(
@@ -83,7 +83,6 @@ def create_user(signup_data: CreateRequest, session: CommittedSessionDep) -> Any
         accumulated_volume=user_mlm_data.accumulated_volume,
         binary_volume_left=user_mlm_data.binary_volume_left,
         binary_volume_right=user_mlm_data.binary_volume_right,
-        sponsor_id=sponsor.id,
         placement_sponsor_id=user_mlm_data.placement_sponsor_id if user_mlm_data.placement_sponsor_id else sponsor.id,
         mentor_id=user_mlm_data.mentor_id,
     )

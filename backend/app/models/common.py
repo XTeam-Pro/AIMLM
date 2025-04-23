@@ -8,7 +8,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 from app.models.gamification import Achievement
 if TYPE_CHECKING:
-    from app.models.user import User, Wallet
+    from app.models.user import User
 from app.schemas.types.common_types import TransactionStatus
 
 
@@ -118,8 +118,8 @@ class Transaction(SQLModel, table=True):
     seller_id: uuid.UUID = Field(foreign_key="users.id")
 
     # Links to wallets
-    source_wallet_id: Optional[uuid.UUID] = Field(default=None, foreign_key="wallets.id")
-    target_wallet_id: Optional[uuid.UUID] = Field(default=None, foreign_key="wallets.id")
+    # source_wallet_id: Optional[uuid.UUID] = Field(default=None, foreign_key="wallets.id")
+    # target_wallet_id: Optional[uuid.UUID] = Field(default=None, foreign_key="wallets.id")
 
     cash_amount: Decimal = Field(..., max_digits=12, decimal_places=2)
     pv_amount: Decimal = Field(..., max_digits=12, decimal_places=2)
@@ -143,12 +143,12 @@ class Transaction(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[Transaction.seller_id]"}
     )
 
-    source_wallet: Optional["Wallet"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Transaction.source_wallet_id]"}
-    )
-    target_wallet: Optional["Wallet"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Transaction.target_wallet_id]"}
-    )
+    # source_wallet: Optional["Wallet"] = Relationship(
+    #     sa_relationship_kwargs={"foreign_keys": "[Transaction.source_wallet_id]"}
+    # )
+    # target_wallet: Optional["Wallet"] = Relationship(
+    #     sa_relationship_kwargs={"foreign_keys": "[Transaction.target_wallet_id]"}
+    # )
 
     product: Optional["Product"] = Relationship()
     achievement: Optional["Achievement"] = Relationship()

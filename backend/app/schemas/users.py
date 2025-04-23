@@ -7,10 +7,9 @@ from typing import Optional
 import uuid
 from datetime import datetime
 
-from app.schemas.types.common_types import MLMRankType
-from app.schemas.types.localization_types import CountryEnum, CurrencyType
+from app.schemas.types.localization_types import CurrencyType
 
-from app.schemas.types.user_types import UserRole, UserStatus, WalletType
+from app.schemas.types.user_types import  WalletType
 from app.schemas.mlm import  UserMLMInput
 
 class WalletBase(BaseModel):
@@ -49,11 +48,19 @@ class WalletPublic(WalletBase):
 
 
 class UserUpdateMe(BaseModel):
-    full_name: Optional[str] = Field(default=None, max_length=255)
+    name: Optional[str] = Field(default=None, max_length=100)
+    surname: Optional[str] = Field(default=None, max_length=100)
+    patronymic: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = Field(default=None, max_length=255)
+    phone: Optional[str] = Field(default=None, max_length=20)
+    country: Optional[str] = Field(default=None, max_length=100)
+    region: Optional[str] = Field(default=None, max_length=100)
+    city: Optional[str] = Field(default=None, max_length=100)
 
     @field_validator('email')
     def validate_email_rfc(cls, v):
+        if v is None:
+            return v
         try:
             result = validate_email(v, check_deliverability=False)
             if v.lower() != "admin@example.com":
@@ -64,97 +71,87 @@ class UserUpdateMe(BaseModel):
             return result.normalized
         except EmailNotValidError as e:
             raise ValueError(str(e))
-
-
-class UserBase(BaseModel):
-    email: str | EmailStr
-    username: str
-    phone: str
-    full_name: str
-    country: CountryEnum = None
-    @field_validator('email')
-    def validate_email_rfc(cls, v):
-        try:
-            result = validate_email(v, check_deliverability=False)
-            if v.lower() != "admin@example.com":
-                blocked_domains = {'tempmail.com', 'example.com'}
-                domain = v.split('@')[-1]
-                if domain in blocked_domains:
-                    raise ValueError('Disposable emails are not allowed')
-            return result.normalized
-        except EmailNotValidError as e:
-            raise ValueError(str(e))
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class TestSponsorCreate(UserBase):
-    email: EmailStr = Field(examples=["sponsor@google.com"])
-    username: str = Field(max_length=100)
-    phone: str = Field(max_length=20)
-    full_name: str = Field(max_length=255)
-    password: str = Field(min_length=8)
-    rank: MLMRankType = Field(default=MLMRankType.NEWBIE)
-    country: CountryEnum = None
-    role: UserRole = Field(default=UserRole.DISTRIBUTOR)
-    registration_date: datetime = Field(default=lambda: datetime.now())
-    address: str
-    postcode: str
-
-    @field_validator('password')
-    def validate_password_complexity(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
-
-class UserRegister(UserBase):
-    password: str
-    address: str = Field(examples=["Nevsky Prospekt, Saint Petersburg"])
-    referral_code: Optional[str] = Field(default=None, max_length=12)
-    postcode: str
-    role: UserRole = Field(default=UserRole.CLIENT)
-    status: UserStatus = Field(default=UserStatus.ACTIVE)
-    rank: MLMRankType | None = Field(default=MLMRankType.NEWBIE)
-
-    @field_validator('address')
-    def validate_address(cls, v: str) -> str:
-        v = v.strip()
-        if not re.match(r'^[\w\s\-,.#]+$', v):
-            raise ValueError("Address contains invalid characters.")
-        if len(v.split(',')) < 2:
-            raise ValueError("Address should include at least street and city separated by comma")
-        return v.title()
-
-    @field_validator('postcode')
-    def validate_postcode(cls, v: str) -> str:
-        v = v.strip().upper()
-        if not re.match(r'^[A-Z0-9\- ]{3,12}$', v):
-            raise ValueError("Postcode must contain only letters, numbers, spaces or hyphens")
-        return v
-
-    @field_validator('password')
-    def validate_password_complexity(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
 
     @field_validator('phone')
     def validate_phone(cls, v):
-        if not v.startswith('+'):
-            raise ValueError('Phone must start with +')
-        if len(v) < 10:
-            raise ValueError('Phone too short')
+        if v is None:
+            return v
+        # Basic international phone validation (E.164)
+        if not re.match(r"^\+?[1-9]\d{1,14}$", v):
+            raise ValueError("Phone number must be in international format (e.g. +1234567890)")
+        return v
+
+
+
+class UserBase(BaseModel):
+    email: EmailStr | str = Field(examples=["sponsor@google.com"])
+    name: str = Field(max_length=100)
+    surname: str = Field(max_length=100)
+    patronymic: str = Field(max_length=100)
+    phone: str = Field(max_length=20)
+    country: Optional[str] = Field(default=None, max_length=100)
+    region: Optional[str] = Field(default=None, max_length=100)
+    city: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator('email')
+    def validate_email_rfc(cls, v):
+        try:
+            result = validate_email(v, check_deliverability=False)
+            if v.lower() != "admin@example.com":
+                blocked_domains = {'tempmail.com', 'example.com'}
+                domain = v.split('@')[-1]
+                if domain in blocked_domains:
+                    raise ValueError('Disposable emails are not allowed')
+            return result.normalized
+        except EmailNotValidError as e:
+            raise ValueError(str(e))
+
+    @field_validator('phone')
+    def validate_phone(cls, v):
+        if v is None:
+            return v
+        # Basic international phone validation (E.164)
+        if not re.match(r"^\+?[1-9]\d{1,14}$", v):
+            raise ValueError("Phone number must be in international format (e.g. +1234567890)")
+        return v
+
+
+class TestSponsorCreate(UserBase):
+    email: EmailStr | str = Field(examples=["sponsor@google.com"])
+    password: str = Field(min_length=8)
+    role: str = Field(default="DISTRIBUTOR")
+    referral_code: Optional[str] = Field(default=None, max_length=8)
+
+    @field_validator('password')
+    def validate_password_complexity(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
+
+class UserRegister(UserBase):
+    password: str
+    referral_code: Optional[str] = Field(default=None, max_length=8)
+    role: str = Field(default="CLIENT")
+    gender: str = Field(default="MALE")
+    status: str = Field(default="ACTIVE")
+
+    @field_validator('password')
+    def validate_password_complexity(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
         return v
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class UserCreate(UserRegister):
     pass
@@ -164,18 +161,22 @@ class UserCreate(UserRegister):
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    full_name: Optional[str] = None
-    role: Optional[UserRole] = Field(default=UserRole.CLIENT)
-    status: Optional[UserStatus] = Field(default=UserStatus.ACTIVE)
-    country: Optional[CountryEnum] = None
-    rank: Optional[MLMRankType] = None
+    name: Optional[str] = Field(default=None, max_length=100)
+    surname: Optional[str] = Field(default=None, max_length=100)
+    patronymic: Optional[str] = Field(default=None, max_length=100)
+    phone: Optional[str] = Field(default=None, max_length=20)
+    country: Optional[str] = Field(default=None, max_length=100)
+    region: Optional[str] = Field(default=None, max_length=100)
+    city: Optional[str] = Field(default=None, max_length=100)
+    role: Optional[str] = None
+    status: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
     @field_validator('email')
     def validate_email_rfc(cls, v):
-        from email_validator import validate_email, EmailNotValidError
+        if v is None:
+            return v
         try:
             result = validate_email(v, check_deliverability=False)
             blocked_domains = {'tempmail.com', 'example.com'}
@@ -188,21 +189,26 @@ class UserUpdate(BaseModel):
 
     @field_validator('phone')
     def validate_phone(cls, v):
-        if not v.startswith('+'):
-            raise ValueError('Phone must start with +')
-        if len(v) < 10:
-            raise ValueError('Phone too short')
-        return v
+        if v is None:
+            return v
+        try:
+            parsed = phonenumbers.parse(v, None)
+            if not phonenumbers.is_valid_number(parsed):
+                raise ValueError("Invalid phone number")
+            return phonenumbers.format_number(
+                parsed,
+                phonenumbers.PhoneNumberFormat.E164
+            )
+        except phonenumbers.phonenumberutil.NumberParseException as e:
+            raise ValueError("Invalid phone number format")
+
 
 class UserPublic(UserBase):
     id: uuid.UUID
-    address: str
-    postcode: str
-    role: UserRole
-    rank: MLMRankType | None
-    status: UserStatus
-    country: Optional[CountryEnum] = None
-    referral_code: Optional[str] = Field(max_length=12)
+    role: str
+    status: str
+    referral_code: Optional[str] = Field(max_length=8)
+    sponsor_id: Optional[uuid.UUID] = None
     registration_date: datetime
     is_active: bool
 

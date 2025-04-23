@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 4aced895995e
+Revision ID: 70dbb93c3ab7
 Revises: 
-Create Date: 2025-04-18 06:54:28.935310
+Create Date: 2025-04-23 17:05:21.919908
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = '4aced895995e'
+revision = '70dbb93c3ab7'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -51,29 +51,24 @@ def upgrade():
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('time_zones',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('country', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('offset', sqlmodel.sql.sqltypes.AutoString(length=6), nullable=False),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('users',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-    sa.Column('phone', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False),
-    sa.Column('username', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
-    sa.Column('full_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
-    sa.Column('postcode', sqlmodel.sql.sqltypes.AutoString(length=12), nullable=False),
-    sa.Column('address', sqlmodel.sql.sqltypes.AutoString(length=200), nullable=False),
+    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('surname', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('patronymic', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('phone', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('gender', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('country', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('region', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('city', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('role', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('referral_code', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('hashed_password', sqlmodel.sql.sqltypes.AutoString(length=128), nullable=False),
+    sa.Column('sponsor_id', sa.Uuid(), nullable=True),
     sa.Column('registration_date', sa.DateTime(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('rank', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -103,6 +98,24 @@ def upgrade():
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('transactions',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('buyer_id', sa.Uuid(), nullable=False),
+    sa.Column('seller_id', sa.Uuid(), nullable=False),
+    sa.Column('cash_amount', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('pv_amount', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('product_id', sa.Uuid(), nullable=True),
+    sa.Column('achievement_id', sa.Uuid(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('additional_info', sa.JSON(), nullable=True),
+    sa.ForeignKeyConstraint(['achievement_id'], ['achievements.id'], ),
+    sa.ForeignKeyConstraint(['buyer_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
+    sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('user_achievements',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
@@ -129,17 +142,16 @@ def upgrade():
     sa.Column('contract_type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('current_rank', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('current_club', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('rank', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('personal_volume', sa.Numeric(), nullable=False),
     sa.Column('group_volume', sa.Numeric(), nullable=False),
     sa.Column('accumulated_volume', sa.Numeric(), nullable=False),
     sa.Column('binary_volume_left', sa.Numeric(), nullable=False),
     sa.Column('binary_volume_right', sa.Numeric(), nullable=False),
-    sa.Column('sponsor_id', sa.Uuid(), nullable=True),
     sa.Column('placement_sponsor_id', sa.Uuid(), nullable=True),
     sa.Column('mentor_id', sa.Uuid(), nullable=True),
     sa.ForeignKeyConstraint(['mentor_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['placement_sponsor_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['sponsor_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
@@ -158,17 +170,6 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('wallets',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('balance', sa.Numeric(), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_wallets_user_id'), 'wallets', ['user_id'], unique=False)
     op.create_table('bonuses',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
@@ -206,26 +207,20 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('transactions',
+    op.create_table('purchases',
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('buyer_id', sa.Uuid(), nullable=False),
-    sa.Column('seller_id', sa.Uuid(), nullable=False),
-    sa.Column('source_wallet_id', sa.Uuid(), nullable=True),
-    sa.Column('target_wallet_id', sa.Uuid(), nullable=True),
-    sa.Column('cash_amount', sa.Numeric(precision=12, scale=2), nullable=False),
+    sa.Column('user_id', sa.Uuid(), nullable=False),
+    sa.Column('is_starter', sa.Boolean(), nullable=False),
+    sa.Column('purchase_date', sa.DateTime(), nullable=False),
+    sa.Column('total_amount', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('pv_amount', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('product_id', sa.Uuid(), nullable=True),
-    sa.Column('achievement_id', sa.Uuid(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('additional_info', sa.JSON(), nullable=True),
-    sa.ForeignKeyConstraint(['achievement_id'], ['achievements.id'], ),
-    sa.ForeignKeyConstraint(['buyer_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
-    sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['source_wallet_id'], ['wallets.id'], ),
-    sa.ForeignKeyConstraint(['target_wallet_id'], ['wallets.id'], ),
+    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('is_client_purchase', sa.Boolean(), nullable=False),
+    sa.Column('client_id', sa.Uuid(), nullable=True),
+    sa.Column('transaction_id', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['transaction_id'], ['transactions.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user_activities',
@@ -252,22 +247,6 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['user_mlm.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('purchases',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('is_starter', sa.Boolean(), nullable=False),
-    sa.Column('purchase_date', sa.DateTime(), nullable=False),
-    sa.Column('total_amount', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('pv_amount', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('is_client_purchase', sa.Boolean(), nullable=False),
-    sa.Column('client_id', sa.Uuid(), nullable=True),
-    sa.Column('transaction_id', sa.Uuid(), nullable=True),
-    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['transaction_id'], ['transactions.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('purchase_items',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('purchase_id', sa.Uuid(), nullable=False),
@@ -285,25 +264,22 @@ def upgrade():
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('purchase_items')
-    op.drop_table('purchases')
     op.drop_table('user_rank_history')
     op.drop_table('user_activities')
-    op.drop_table('transactions')
+    op.drop_table('purchases')
     op.drop_table('challenge_participants')
     op.drop_table('business_centers')
     op.drop_table('bonuses')
-    op.drop_index(op.f('ix_wallets_user_id'), table_name='wallets')
-    op.drop_table('wallets')
     op.drop_table('user_product_interactions')
     op.drop_table('user_mlm')
     op.drop_table('user_hierarchy')
     op.drop_table('user_achievements')
+    op.drop_table('transactions')
     op.drop_table('challenges')
     op.drop_table('cart_items')
     op.drop_index(op.f('ix_users_referral_code'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
-    op.drop_table('time_zones')
     op.drop_table('products')
     op.drop_table('generation_bonus_matrix')
     op.drop_table('achievements')

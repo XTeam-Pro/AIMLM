@@ -17,13 +17,13 @@ class UserMLM(SQLModel, table=True):
     current_rank: str
     current_club: str
 
+    rank: Optional[str] = Field(default=None)
     personal_volume: Decimal = Field(default=Decimal(0))
     group_volume: Decimal = Field(default=Decimal(0))
     accumulated_volume: Decimal = Field(default=Decimal(0))
     binary_volume_left: Decimal = Field(default=Decimal(0))
     binary_volume_right: Decimal = Field(default=Decimal(0))
 
-    sponsor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     placement_sponsor_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
 
     user: "User" = Relationship(

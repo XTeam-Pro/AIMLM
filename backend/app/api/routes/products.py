@@ -9,7 +9,7 @@ from app.api.dependencies.deps import CurrentUser, CommittedSessionDep, Uncommit
 from app.core.postgres.dao import ProductDAO, UserProductInteractionDAO
 from app.schemas.common import ProductPublic, ProductCreate, ProductUpdate, Message, ProductsCreate
 
-router = APIRouter(prefix="/product", tags=["products"])
+router = APIRouter(prefix="/product", tags=["Products"])
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 

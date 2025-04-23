@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
+
 from passlib.context import CryptContext
 
 from app.core.postgres.config import settings
@@ -28,3 +29,4 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+

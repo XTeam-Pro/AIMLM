@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-router = APIRouter(tags=["login"])
+router = APIRouter(tags=["Login"])
 
 
 @router.post("/login/access-token")
@@ -146,3 +146,5 @@ def recover_password_html_content(email: str, session: CommittedSessionDep) -> A
     return HTMLResponse(
         content=email_data.html_content, headers={"subject:": email_data.subject}
     )
+
+

@@ -11,7 +11,7 @@ from app.api.services.sponsor_bonus_service import SponsorBonusService
 from app.core.postgres.dao import BonusDAO
 from app.schemas.mlm import BonusCreate, BonusPublic
 
-router = APIRouter(prefix="/bonuses", tags=["bonuses"])
+router = APIRouter(prefix="/bonuses", tags=["Bonuses"])
 
 
 @router.post("/generation/calculate", response_model=list[BonusCreate])

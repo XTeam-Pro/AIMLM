@@ -7,7 +7,7 @@ from app.api.dependencies.deps import CommittedSessionDep, CurrentUser
 from app.core.postgres.dao import UserDAO
 from app.schemas.types.user_types import UserRole
 
-router = APIRouter(prefix="/mentors", tags=["mentors"])
+router = APIRouter(prefix="/mentors", tags=["Mentors"])
 
 
 @router.post("/my_clients/{client_id}")

@@ -5,13 +5,12 @@ from starlette import status
 
 from app.api.dependencies.deps import get_current_active_superuser, CommittedSessionDep
 from app.core.postgres.dao import GenerationBonusMatrixDAO
-from app.models.mlm import GenerationBonusMatrix
 from app.schemas.common import Message
 from app.schemas.mlm import GenerationBonusMatrixList
 
 from app.utils import generate_test_email, send_email
 
-router = APIRouter(prefix="/utils", tags=["utils"])
+router = APIRouter(prefix="/utils", tags=["Utils"])
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 

@@ -16,7 +16,7 @@ from app.schemas.types.gamification_types import LeaderboardPeriod, LeaderboardT
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["gamification"], prefix="/gamification")
+router = APIRouter(tags=["Gamification"], prefix="/gamification")
 
 
 
