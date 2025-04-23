@@ -136,9 +136,7 @@ class TestSponsorCreate(UserBase):
 class UserRegister(UserBase):
     password: str
     referral_code: Optional[str] = Field(default=None, max_length=8)
-    role: str = Field(default="CLIENT")
     gender: str = Field(default="MALE")
-    status: str = Field(default="ACTIVE")
 
     @field_validator('password')
     def validate_password_complexity(cls, v):
