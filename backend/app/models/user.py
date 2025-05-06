@@ -1,38 +1,36 @@
-
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
-
 
 from sqlmodel import SQLModel, Field, Relationship
 
-from app.models.common import Transaction, UserProductInteraction, Purchase,CartItem
+from app.models.common import Transaction, UserProductInteraction, Purchase, CartItem
 from app.models.mlm import UserMLM
+from app.schemas.types.localization_types import CurrencyType
+
+from app.schemas.types.user_types import UserRole, UserStatus, WalletType
 
 
-from app.schemas.types.user_types import UserRole, UserStatus
 #
-# class ExchangeRate(SQLModel, table=True):
-#     __tablename__ = "exchange_rates" #TODO: we are going to have some external API for this
-#
-#     id: int | None = Field(default=None, primary_key=True)
-#     from_currency: CurrencyType = Field(index=True)
-#     to_currency: CurrencyType = Field(index=True)
-#     rate: Decimal = Field(..., ge=0)
-#     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-# class Wallet(SQLModel, table=True):
-#     __tablename__ = "wallets" #TODO: we are going to have some external API for this
-#     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-#     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
-#     currency: str = Field(default=CurrencyType.RUB)
-#     type:  #str = Field(default=WalletType.BONUS)
-#     balance: Decimal = Field(default=0, ge=0)
-#     is_active: bool = Field(default=True)
-#
-#     user: "User" = Relationship(back_populates="wallets")
+class ExchangeRate(SQLModel, table=True):
+    __tablename__ = "exchange_rates"
+    id: int | None = Field(default=None, primary_key=True)
+    from_currency: str = Field(index=True)
+    to_currency: str = Field(index=True)
+    rate: Decimal = Field(..., ge=0)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class Wallet(SQLModel, table=True):
+    __tablename__ = "wallets"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    currency: str = Field(default=CurrencyType.RUB)
+    type: str = Field(default=WalletType.BONUS)
+    balance: Decimal = Field(default=0, ge=0)
+    is_active: bool = Field(default=True)
+    user: "User" = Relationship(back_populates="wallets")
 
 
 class User(SQLModel, table=True):
@@ -55,7 +53,7 @@ class User(SQLModel, table=True):
     registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)
 
-    #wallets: list["Wallet"] = Relationship(back_populates="user")
+    wallets: list["Wallet"] = Relationship(back_populates="user")
 
     mentees: list["UserMLM"] = Relationship(
         back_populates="mentor",
@@ -84,9 +82,3 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[UserMLM.user_id]"}
     )
     cart_items: list[CartItem] = Relationship(back_populates="user")
-
-
-
-
-
-

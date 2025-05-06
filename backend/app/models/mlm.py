@@ -73,6 +73,7 @@ class Bonus(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user_mlm.id")
     bonus_type: str
     amount: Decimal = Field(...)
+    source_user_id: str = Field(default=None)
     currency: str
     calculation_period: str
     is_paid: bool = Field(default=False)

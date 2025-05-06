@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 from app.api.services.mlm_service import MLMService
+from app.api.services.wallet_service import WalletService
 # from app.api.services.wallet_service import WalletService
 from app.core.postgres.dao import (
     ProductDAO,
@@ -40,7 +41,7 @@ class SaleService:
         self._transaction_dao = TransactionDAO(session)
         self._mlm_service = MLMService(session)
         self._bonus_dao = BonusDAO(session)
-        # self._wallet_service = WalletService(session)
+        self._wallet_service = WalletService(session)
         self._company_account_id = UUID("00000000-0000-0000-0000-000000000001")
 
     def process_sale(self, seller_id: UUID, product_id: UUID, buyer_id: UUID) -> SaleResponse:
@@ -53,33 +54,31 @@ class SaleService:
 
         is_sponsor_sale = buyer.sponsor_id == seller_id
 
-        # Расчёт долей
+        # Calculating shares
         seller_share = product.price * Decimal('0.5' if is_sponsor_sale else '0.3')
         company_share = product.price - seller_share
         pv_value = product.pv_value
 
-        # Assets and PV transfers
-        #self._wallet_service.move_funds_and_log_transaction(
-        #     source_user_id=buyer_id,
-        #     target_user_id=seller_id,
-        #     amount=seller_share,
-        #     transaction_type=TransactionType.NETWORK_SALE,
-        #     pv_amount=pv_value,
-        #     product_id=product.id,
-        #     note="MLM продажа (доля дистрибьютора)"
-        # )
-        #
-        # self._wallet_service.move_funds_and_log_transaction(
-        #     source_user_id=buyer_id,
-        #     target_user_id=self._company_account_id,
-        #     amount=company_share,
-        #     transaction_type=TransactionType.NETWORK_SALE,
-        #     pv_amount=Decimal(0),
-        #     product_id=product.id,
-        #     note="MLM продажа (доля компании)"
-        # )
+        self._wallet_service.move_funds_and_log_transaction(
+            source_user_id=buyer_id,
+            target_user_id=seller_id,
+            amount=seller_share,
+            transaction_type=TransactionType.NETWORK_SALE,
+            pv_amount=pv_value,
+            product_id=product.id,
+            note="MLM disposal (Distributor's share)"
+        )
 
-        # Transaction creation
+        self._wallet_service.move_funds_and_log_transaction(
+            source_user_id=buyer_id,
+            target_user_id=self._company_account_id,
+            amount=company_share,
+            transaction_type=TransactionType.NETWORK_SALE,
+            pv_amount=Decimal(0),
+            product_id=product.id,
+            note="MLM disposal  (Company's share)"
+        )
+
         transaction = self._create_transaction(
             seller_id=seller_id,
             buyer_id=buyer_id,
@@ -87,12 +86,11 @@ class SaleService:
             transaction_type=TransactionType.NETWORK_SALE
         )
 
-        # Bonus distribution
         if is_sponsor_sale:
             self._distribute_mlm_bonuses(buyer_id, product)
 
-        # Actual seller balance return
         seller = self._user_dao.find_one_or_none_by_id(seller_id)
+
         return SaleResponse(
             message="Sale processed successfully",
             transaction_id=transaction.id,
@@ -123,11 +121,13 @@ class SaleService:
         )
         return self._transaction_dao.add(transaction_data)
 
+
     def _distribute_mlm_bonuses(self, buyer_id: UUID, product):
         """Trigger MLM bonus distribution"""
         self._mlm_service.on_product_purchase(
             buyer_id=buyer_id
         )
+
 
     def _validate_seller(self, user_id: UUID):
         user = self._user_dao.find_one_or_none_by_id(user_id)
@@ -135,17 +135,20 @@ class SaleService:
             raise HTTPException(status_code=403, detail="User is not authorized to perform sales")
         return user
 
+
     def _validate_product(self, product_id: UUID):
         product = self._product_dao.find_one_or_none_by_id(product_id)
         if not product or not product.is_active:
             raise HTTPException(status_code=404, detail="Product not available for sale")
         return product
 
+
     def _get_user(self, user_id: UUID):
         user = self._user_dao.find_one_or_none_by_id(user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user
+
 
     def _check_buyer_funds(self, buyer, product_price: Decimal):
         if buyer.cash_balance < product_price:

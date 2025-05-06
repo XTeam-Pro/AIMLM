@@ -71,8 +71,8 @@ class TransactionBase(BaseModel):
 class TransactionCreate(TransactionBase):
     product_id: Optional[uuid.UUID]
     status: TransactionStatus
-    # source_wallet_id: uuid.UUID
-    # target_wallet_id: uuid.UUID
+    source_wallet_id: uuid.UUID
+    target_wallet_id: uuid.UUID
     buyer_id: uuid.UUID
     seller_id: uuid.UUID
 
@@ -98,14 +98,14 @@ class UserProductInteractionBase(BaseModel):
     achievement_id: Optional[uuid.UUID] = Field(default=None)
     additional_info: Optional[Dict[str, Any]] = Field(default=None)
 
-# Схема для создания нового UserProductInteraction
+
 class UserProductInteractionCreate(UserProductInteractionBase):
     user_id: uuid.UUID
     product_id: Optional[uuid.UUID] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-# Схема для отображения UserProductInteraction
+
 class UserProductInteractionPublic(UserProductInteractionBase):
     id: uuid.UUID
     user_id: uuid.UUID

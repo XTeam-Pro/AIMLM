@@ -15,7 +15,7 @@ from app.core.postgres.dao import (
     UserProductInteractionDAO,
     UserDAO,
     CartItemDAO, UserMLMDAO, TransactionDAO, UserActivityDAO, UserRankHistoryDAO, PurchaseDAO, BonusDAO,
-    UserHierarchyDAO#, WalletDAO
+    UserHierarchyDAO, WalletDAO  # , WalletDAO
 )
 from app.core.security import get_password_hash, verify_password
 from app.schemas.auth import UpdatePassword
@@ -145,6 +145,7 @@ def delete_user_me(
     UserProductInteractionDAO(session).delete({"user_id": current_user.id})
     UserMLMDAO(session).delete({"user_id": current_user.id})
     CartItemDAO(session).delete({"user_id": current_user.id})
+    WalletDAO(session).delete({"user_id": current_user.id})
     UserActivityDAO(session).delete({"user_id": current_user.id})
     TransactionDAO(session).delete({"buyer_id": current_user.id})
     PurchaseDAO(session).delete({"user_id": current_user.id})
@@ -318,7 +319,7 @@ def delete_user(
         )
     try:
         UserProductInteractionDAO(session).delete({"user_id": user_id})
-        #WalletDAO(session).delete({"user_id": user_id})
+        WalletDAO(session).delete({"user_id": user_id})
         CartItemDAO(session).delete({"user_id": user_id})
         UserActivityDAO(session).delete({"user_id": user_id})
         TransactionDAO(session).delete({"buyer_id": user_id})

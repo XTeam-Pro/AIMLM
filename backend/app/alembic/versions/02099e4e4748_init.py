@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 70dbb93c3ab7
+Revision ID: 02099e4e4748
 Revises: 
-Create Date: 2025-04-23 17:05:21.919908
+Create Date: 2025-05-06 17:55:52.681953
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = '70dbb93c3ab7'
+revision = '02099e4e4748'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -29,6 +29,16 @@ def upgrade():
     sa.Column('rank', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('exchange_rates',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('from_currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('to_currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('rate', sa.Numeric(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_exchange_rates_from_currency'), 'exchange_rates', ['from_currency'], unique=False)
+    op.create_index(op.f('ix_exchange_rates_to_currency'), 'exchange_rates', ['to_currency'], unique=False)
     op.create_table('generation_bonus_matrix',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('rank', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
@@ -170,11 +180,23 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('wallets',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('user_id', sa.Uuid(), nullable=False),
+    sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('balance', sa.Numeric(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_wallets_user_id'), 'wallets', ['user_id'], unique=False)
     op.create_table('bonuses',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
     sa.Column('bonus_type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('amount', sa.Numeric(), nullable=False),
+    sa.Column('source_user_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('currency', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('calculation_period', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('is_paid', sa.Boolean(), nullable=False),
@@ -270,6 +292,8 @@ def downgrade():
     op.drop_table('challenge_participants')
     op.drop_table('business_centers')
     op.drop_table('bonuses')
+    op.drop_index(op.f('ix_wallets_user_id'), table_name='wallets')
+    op.drop_table('wallets')
     op.drop_table('user_product_interactions')
     op.drop_table('user_mlm')
     op.drop_table('user_hierarchy')
@@ -282,5 +306,8 @@ def downgrade():
     op.drop_table('users')
     op.drop_table('products')
     op.drop_table('generation_bonus_matrix')
+    op.drop_index(op.f('ix_exchange_rates_to_currency'), table_name='exchange_rates')
+    op.drop_index(op.f('ix_exchange_rates_from_currency'), table_name='exchange_rates')
+    op.drop_table('exchange_rates')
     op.drop_table('achievements')
     # ### end Alembic commands ###

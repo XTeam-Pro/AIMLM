@@ -102,6 +102,7 @@ class BonusBase(BaseModel):
     currency: str
     calculation_period: str
     is_paid: bool = Field(default=False)
+    source_user_id: Optional[uuid.UUID] = None
     paid_at: Optional[datetime] = None
 
 class BonusCreate(BonusBase):

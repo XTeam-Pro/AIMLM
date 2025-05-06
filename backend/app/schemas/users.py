@@ -185,27 +185,22 @@ class UserUpdate(BaseModel):
         except EmailNotValidError as e:
             raise ValueError(str(e))
 
-    @field_validator('phone')
     def validate_phone(cls, v):
         if v is None:
             return v
-        try:
-            parsed = phonenumbers.parse(v, None)
-            if not phonenumbers.is_valid_number(parsed):
-                raise ValueError("Invalid phone number")
-            return phonenumbers.format_number(
-                parsed,
-                phonenumbers.PhoneNumberFormat.E164
-            )
-        except phonenumbers.phonenumberutil.NumberParseException as e:
-            raise ValueError("Invalid phone number format")
+        # Basic international phone validation (E.164)
+        if not re.match(r"^\+?[1-9]\d{1,14}$", v):
+            raise ValueError("Phone number must be in international format (e.g. +1234567890)")
+        return v
+
+
 
 
 class UserPublic(UserBase):
     id: uuid.UUID
     role: str
     status: str
-    referral_code: Optional[str] = Field(max_length=8)
+    referral_code: Optional[str] = Field(max_length=16)
     sponsor_id: Optional[uuid.UUID] = None
     registration_date: datetime
     is_active: bool
