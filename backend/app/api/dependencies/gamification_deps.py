@@ -93,15 +93,7 @@ def get_activity_leaderboard(session: Session, limit: int, time_filter: tuple | 
             result[key] = result.get(key, 0) + getattr(it, sum_field)
         return [{"user_id": k, "total_amount": v} for k, v in result.items()]
 
-    # 2. Get transaction data
-    transaction_filters = {
-        "transaction_type": ("not_in", [TransactionType.CASH_OUT, TransactionType.PENALTY])
-    }
-    if time_filter:
-        transaction_filters["created_at"] = time_filter
-
-    transactions = transaction_dao.find_all(filters=transaction_filters, limit=limit)
-    transaction_data = aggregate_data(transactions, "user_id", "pv_amount")  # or "cash_amount"
+    transaction_data = aggregate_data("user_id", "pv_amount")  # or "cash_amount"
 
     # 3. Get challenge data
     challenge_filters = {"status": "completed"}

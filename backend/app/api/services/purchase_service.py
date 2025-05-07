@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from app.api.services.mlm_service import MLMService
 from app.api.services.wallet_service import WalletService
-# from app.api.services.wallet_service import WalletService
 from app.core.postgres.dao import (
     ProductDAO,
     UserDAO,
@@ -74,7 +73,7 @@ class PurchaseService:
 
         return PurchaseResponse(
             message="Purchase successful",
-            buyer_cash_balance=updated_buyer.mlm_data.cash_balance if buyer else 0,
+            buyer_cash_balance=updated_buyer.mlm_data if buyer else 0,
             seller_pv_earned=product.pv_value if seller else 0,
             seller_pv_balance=updated_seller.pv_balance if seller else 0,
             transaction_id=transaction.id
@@ -105,7 +104,7 @@ class PurchaseService:
 
     def _update_user_balance(self, user_id: UUID, cash_amount: Decimal, pv_amount: Decimal):
         if cash_amount != 0:
-            self.wallet_service.move_funds_and_log_transaction(
+            self._wallet_service.move_funds_and_log_transaction(
                 source_user_id=user_id,
                 target_user_id=self._company_account_id,
                 amount=abs(cash_amount),

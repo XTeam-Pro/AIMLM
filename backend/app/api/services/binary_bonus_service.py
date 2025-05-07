@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -7,7 +8,6 @@ from app.api.services.wallet_service import WalletService
 from app.schemas.mlm import BonusCreate
 from app.schemas.types.gamification_types import BonusType
 from app.schemas.types.localization_types import CurrencyType
-from app.schemas.types.common_types import TransactionType
 
 
 class BinaryBonusService:
@@ -78,6 +78,5 @@ class BinaryBonusService:
         }
 
     def _get_current_period(self) -> str:
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         return f"{now.year}-{now.month:02}"

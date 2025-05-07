@@ -30,7 +30,7 @@ class SponsorBonusService:
         """
         Calculate  bonus for direct referrals(level 1) .
         """
-        sponsored_users = self.user_mlm_dao.find_all(filters={"sponsor_id": user_id})
+        sponsored_users = self.user_dao.find_all(filters={"sponsor_id": user_id})
         total_bonus = Decimal("0.00")
 
         for user in sponsored_users:

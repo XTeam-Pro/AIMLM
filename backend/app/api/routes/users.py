@@ -10,6 +10,7 @@ from app.api.dependencies.deps import (
     UncommittedSessionDep,
 )
 from app.api.services.hierarchy_service import HierarchyService
+from app.api.services.wallet_service import WalletService
 
 from app.core.postgres.dao import (
     UserProductInteractionDAO,
@@ -23,6 +24,7 @@ from app.schemas.common import Message
 from app.schemas.mlm import UserMLMCreate, UserMLMInput, UserMLMUpdate
 from app.schemas.types.common_types import MLMRankType, ContractType
 from app.schemas.types.gamification_types import ClubType
+from app.schemas.types.localization_types import CurrencyType
 from app.schemas.users import UsersPublic, UserPublic, UserUpdateMe, UserUpdate, UserRegister, UserWithMLM
 from app.schemas.users import CreateRequest
 
@@ -168,6 +170,7 @@ def register_user(
     - is_client: Whether the user wants to be in the MLM structure or not
     """
     user_dao = UserDAO(session)
+    wallet_service = WalletService(session)
     user_mlm_dao = UserMLMDAO(session)
     hierarchy_service = HierarchyService(session)
 
@@ -214,6 +217,7 @@ def register_user(
             sponsor_id=sponsor.id,
             new_user_id=user.id
         )
+        wallet_service.create_default_wallets(user.id, CurrencyType.RUB)
     return UserWithMLM(
         user=UserPublic.model_validate(user),
         mlm=UserMLMInput.model_validate(mlm) if mlm else None
