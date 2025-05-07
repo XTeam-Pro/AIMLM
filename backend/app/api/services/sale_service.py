@@ -1,0 +1,155 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+from uuid import UUID
+
+from fastapi import HTTPException
+from pydantic import BaseModel
+
+from app.api.services.mlm_service import MLMService
+from app.api.services.wallet_service import WalletService
+# from app.api.services.wallet_service import WalletService
+from app.core.postgres.dao import (
+    ProductDAO,
+    UserDAO,
+    TransactionDAO,
+    BonusDAO,
+)
+from app.schemas.common import TransactionCreate
+from app.schemas.types.common_types import TransactionType, TransactionStatus
+
+
+class SellerBalances(BaseModel):
+    cash: Decimal
+    pv: Decimal
+
+
+class SaleResponse(BaseModel):
+    message: str
+    transaction_id: UUID
+    cash_amount: Decimal
+    pv_amount: Decimal
+    new_cash_balance: Decimal
+    new_pv_balance: Decimal
+    transaction_type: TransactionType
+
+
+class SaleService:
+    def __init__(self, session):
+        self.session = session
+        self._product_dao = ProductDAO(session)
+        self._user_dao = UserDAO(session)
+        self._transaction_dao = TransactionDAO(session)
+        self._mlm_service = MLMService(session)
+        self._bonus_dao = BonusDAO(session)
+        self._wallet_service = WalletService(session)
+        self._company_account_id = UUID("00000000-0000-0000-0000-000000000001")
+
+    def process_sale(self, seller_id: UUID, product_id: UUID, buyer_id: UUID) -> SaleResponse:
+        """Process MLM sale transaction with full bonus distribution"""
+        self._validate_seller(seller_id)
+        buyer = self._get_user(buyer_id)
+        product = self._validate_product(product_id)
+
+        self._check_buyer_funds(buyer, product.price)
+
+        is_sponsor_sale = buyer.sponsor_id == seller_id
+
+        # Calculating shares
+        seller_share = product.price * Decimal('0.5' if is_sponsor_sale else '0.3')
+        company_share = product.price - seller_share
+        pv_value = product.pv_value
+
+        self._wallet_service.move_funds_and_log_transaction(
+            source_user_id=buyer_id,
+            target_user_id=seller_id,
+            amount=seller_share,
+            transaction_type=TransactionType.NETWORK_SALE,
+            pv_amount=pv_value,
+            product_id=product.id,
+            note="MLM disposal (Distributor's share)"
+        )
+
+        self._wallet_service.move_funds_and_log_transaction(
+            source_user_id=buyer_id,
+            target_user_id=self._company_account_id,
+            amount=company_share,
+            transaction_type=TransactionType.NETWORK_SALE,
+            pv_amount=Decimal(0),
+            product_id=product.id,
+            note="MLM disposal  (Company's share)"
+        )
+
+        transaction = self._create_transaction(
+            seller_id=seller_id,
+            buyer_id=buyer_id,
+            product=product,
+            transaction_type=TransactionType.NETWORK_SALE
+        )
+
+        if is_sponsor_sale:
+            self._distribute_mlm_bonuses(buyer_id, product)
+
+        seller = self._user_dao.find_one_or_none_by_id(seller_id)
+
+        return SaleResponse(
+            message="Sale processed successfully",
+            transaction_id=transaction.id,
+            cash_amount=product.price,
+            pv_amount=product.pv_value,
+            new_cash_balance=seller.cash_balance,
+            new_pv_balance=seller.pv_balance,
+            transaction_type=TransactionType.NETWORK_SALE,
+        )
+
+    def _create_transaction(self, seller_id: UUID, buyer_id: UUID, product, transaction_type: TransactionType):
+        """Create transaction record according to MLM structure"""
+        transaction_data = TransactionCreate(
+            cash_amount=product.price,
+            pv_amount=product.pv_value,
+            type=transaction_type,
+            status=TransactionStatus.COMPLETED,
+            buyer_id=buyer_id,
+            seller_id=seller_id,
+            product_id=product.id,
+            additional_info={
+                "is_mlm_transaction": True,
+                "sponsor_sale": transaction_type == TransactionType.NETWORK_SALE,
+                "product_price": float(product.price),
+                "pv_value": float(product.pv_value),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        )
+        return self._transaction_dao.add(transaction_data)
+
+
+    def _distribute_mlm_bonuses(self, buyer_id: UUID, product):
+        """Trigger MLM bonus distribution"""
+        self._mlm_service.on_product_purchase(
+            buyer_id=buyer_id
+        )
+
+
+    def _validate_seller(self, user_id: UUID):
+        user = self._user_dao.find_one_or_none_by_id(user_id)
+        if not user or not user.is_distributor:
+            raise HTTPException(status_code=403, detail="User is not authorized to perform sales")
+        return user
+
+
+    def _validate_product(self, product_id: UUID):
+        product = self._product_dao.find_one_or_none_by_id(product_id)
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail="Product not available for sale")
+        return product
+
+
+    def _get_user(self, user_id: UUID):
+        user = self._user_dao.find_one_or_none_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+
+
+    def _check_buyer_funds(self, buyer, product_price: Decimal):
+        if buyer.cash_balance < product_price:
+            raise HTTPException(status_code=400, detail="Insufficient buyer funds")

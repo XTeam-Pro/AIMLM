@@ -1,5 +1,4 @@
 services:
-
   db:
     image: postgres:12
     restart: always
@@ -18,6 +17,40 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+
+  mongo_db:
+    image: mongo:latest
+    restart: always
+    networks:
+      - traefik-public
+      - default
+    environment:
+      - MONGO_INITDB_DATABASE=${MONGO_DB?Variable not set}
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    env_file:
+      - .env
+  redis:
+    image: redis:latest
+    restart: always
+    networks:
+      - traefik-public
+      - default
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    env_file:
+      - .env
+    environment:
+       - REDIS_URL=${REDIS_URL?Variable not set}
 
   adminer:
     image: adminer
@@ -73,6 +106,10 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - MONGO_INIT=${MONGO_INIT?Variable not set}
+      - MONGO_URL=${MONGO_URL?Variable not set}
+      - MONGO_DB=${MONGO_DB?Variable not set}
+      - REDIS_URL=${REDIS_URL?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
 
   backend:
@@ -83,6 +120,9 @@ services:
       - default
     depends_on:
       db:
+        condition: service_healthy
+        restart: true
+      redis:
         condition: service_healthy
         restart: true
       prestart:
@@ -162,8 +202,11 @@ services:
 
       # Enable redirection for HTTP and HTTPS
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.middlewares=https-redirect
+
 volumes:
   app-db-data:
+  mongo-data:
+  redis-data:
 
 networks:
   traefik-public:
